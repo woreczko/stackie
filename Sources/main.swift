@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     var calendar: Panel?
     var trashWin: Panel?
     var dictWin: Panel?
+    var quickWin: Panel?
     var welcomeWin: Panel?
     var savedMode: String?
     var status: NSStatusItem!
@@ -55,8 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             if cornerSince == nil { cornerSince = Date() }
             if !cornerFired, let t = cornerSince, Date().timeIntervalSince(t) > 0.25 {
                 cornerFired = true
-                stack?.orderFrontRegardless()
-                newNote(centered: true)
+                showQuickNote()
             }
         } else {
             cornerSince = nil
@@ -235,6 +235,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 
     // MARK: edytor
+
+    /// Szybka notatka z rogu ekranu: małe okienko na środku ekranu z kursorem (pisanie albo dyktowanie).
+    func showQuickNote() {
+        let size = NSSize(width: 460, height: 320)
+        let p = quickWin ?? Panel(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless], backing: .buffered, defer: false)
+        p.isOpaque = false; p.backgroundColor = .clear; p.hasShadow = true
+        p.hidesOnDeactivate = false; p.isMovableByWindowBackground = true
+        p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        p.level = .floating
+        p.appearance = NSAppearance(named: .aqua)
+        let host = NSHostingView(rootView: QuickNoteView(close: { [weak self] in
+            self?.quickWin?.orderOut(nil); self?.quickWin?.contentView = nil
+        }))
+        host.sizingOptions = []
+        p.contentView = host
+        let m = NSEvent.mouseLocation
+        let scr = (NSScreen.screens.first { NSMouseInRect(m, $0.frame, false) } ?? NSScreen.main)?.visibleFrame ?? .zero
+        p.setFrame(NSRect(x: scr.midX - size.width / 2, y: scr.midY - size.height / 2 + 60, width: size.width, height: size.height), display: true)
+        quickWin = p
+        NSApp.activate(ignoringOtherApps: true)
+        p.makeKeyAndOrderFront(nil)
+    }
 
     /// `centered`: karteczka na środku ekranu (z rogu ekranu), inaczej przy kursorze.
     func newNote(centered: Bool = false) {
@@ -817,6 +839,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             w.contentView = NSHostingView(rootView: EditorView(id: id, close: {}).environmentObject(self.store))
             w.orderFront(nil)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { shot(w, "16_pliki"); w.orderOut(nil) }
+        }
+        for (k, t) in [(12.65, ""), (12.72, "Beata dzwoniła, reklama do ELLE na piątek!! logo od Kampa\nfaktura Figure, drukarnia jutro rano")] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + k) {
+                let w = NSWindow(contentRect: NSRect(x: 300, y: 300, width: 460, height: 320), styleMask: [.borderless], backing: .buffered, defer: false)
+                w.isOpaque = false; w.backgroundColor = .clear
+                w.contentView = NSHostingView(rootView: QuickNoteView(close: {}, initial: t))
+                w.orderFront(nil)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { shot(w, t.isEmpty ? "19_szybka_pusta" : "19_szybka"); w.orderOut(nil) }
+            }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 12.8) {
             // „Na dziś” przesunięta na trzecie miejsce (po zrzucie: z powrotem, to ustawienie użytkownika)
