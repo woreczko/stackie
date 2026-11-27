@@ -5,6 +5,11 @@ Hover over the stack and it fans out. Every note is a small project with tasks, 
 
 Polska wersja nazywa się **Stosik**: opis po polsku jest niżej.
 
+### ⬇️ [Download Stackie for Mac / Pobierz](https://github.com/woreczko/stackie/releases/latest)
+
+Open the link, then click **Stackie-….zip** under *Assets*. Unzip and drag the app to Applications.
+Otwórz link i kliknij **Stackie-….zip** w sekcji *Assets*. Rozpakuj i przeciągnij apkę do Aplikacji.
+
 ![Stackie](docs/stack.png)
 
 ## Features
