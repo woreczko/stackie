@@ -1,8 +1,10 @@
 import SwiftUI
 
 let CAL_BG = Color(hex: 0x1F1E23)
-let CAL_GREY = Color(hex: 0xD3D1CD)
-let CAL_PAPER = Color(hex: 0xF7F1E7)
+var CAL_GREY: Color { Theme.dark ? Color(hex: 0x44434A) : Color(hex: 0xD3D1CD) }
+var CAL_PAPER: Color { Theme.dark ? Color(hex: 0x26252B) : Color(hex: 0xF7F1E7) }
+/// Jasny papier okienka powitalnego (bez zmiany w ciemnym wyglądzie).
+let PAPER_FIXED = Color(hex: 0xF7F1E7)
 
 /// Dni miesiąca w siatce od poniedziałku (puste pola = nil).
 func monthGrid(_ m: Date) -> [Date?] {
@@ -61,7 +63,7 @@ struct DayBubble: View {
             DayRing(segs: store.segments(on: day, mode: mode), width: ring)
             Text("\(Calendar.current.component(.day, from: day))")
                 .font(.system(size: size * 0.34, weight: today || closed ? .bold : .medium).monospacedDigit())
-                .foregroundStyle(today || closed ? .white : Color.ink.opacity(dim ? 0.45 : 0.85))
+                .foregroundStyle(today ? .white : closed ? Color.onInk : Color.ink.opacity(dim ? 0.45 : 0.85))
             if due {
                 Circle().fill(PriorityIcon.purple)
                     .overlay(Circle().strokeBorder(CAL_PAPER, lineWidth: size * 0.04))
@@ -195,7 +197,7 @@ struct CalendarView: View {
                         ForEach([CalMode.client, .project, .tag], id: \.self) { m in
                             Button { withAnimation(.spring(response: 0.25)) { modeRaw = m.rawValue } } label: {
                                 Text(m == .client ? L("Klienci") : m == .project ? L("Projekty") : L("Tagi")).font(.system(size: 11.5, weight: .semibold))
-                                    .foregroundStyle(mode == m ? .white : Color.ink.opacity(0.7))
+                                    .foregroundStyle(mode == m ? Color.onInk : Color.ink.opacity(0.7))
                                     .padding(.horizontal, 10).frame(height: 24)
                                     .background(Capsule().fill(mode == m ? Color.ink : .clear))
                                     .contentShape(Capsule())
@@ -274,7 +276,7 @@ struct CalendarView: View {
             ForEach(Array(items.enumerated()), id: \.offset) { i, it in
                 Button { withAnimation(.spring(response: 0.25)) { pick(i) } } label: {
                     Text(it.0).font(.system(size: 11.5, weight: .semibold))
-                        .foregroundStyle(it.1 ? .white : Color.ink.opacity(0.7))
+                        .foregroundStyle(it.1 ? Color.onInk : Color.ink.opacity(0.7))
                         .padding(.horizontal, 10).frame(height: 24)
                         .background(Capsule().fill(it.1 ? Color.ink : .clear))
                         .contentShape(Capsule())
@@ -405,7 +407,7 @@ private struct Summary: View {
     private func row(_ n: Note) -> some View {
         Button { open(n.id) } label: {
             HStack(spacing: 9) {
-                RoundedRectangle(cornerRadius: 3).fill(palette(n.color).bg).frame(width: 6, height: 26)
+                RoundedRectangle(cornerRadius: 3).fill(accent(n.color)).frame(width: 6, height: 26)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(n.title.isEmpty ? L("Bez tytułu") : n.title).font(.system(size: 12.5, weight: .semibold)).lineLimit(1)
                         .strikethrough(n.archived, color: .white.opacity(0.5))

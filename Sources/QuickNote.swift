@@ -32,7 +32,7 @@ struct QuickNoteView: View {
         }
         .padding(18)
         .frame(width: 460, height: 320, alignment: .topLeading)
-        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color(hex: 0xF7F1E7)))
+        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(CAL_PAPER))
         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(.black.opacity(0.1)))
         .foregroundStyle(Color.ink)
         .onAppear {
@@ -87,7 +87,7 @@ struct QuickNoteView: View {
                         if busy { ProgressView().controlSize(.small) } else { Image(systemName: "sparkles") }
                         Text(L("Zrób zadania"))
                     }
-                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(Color.onInk)
                     .padding(.horizontal, 14).padding(.vertical, 7)
                     .background(Capsule().fill(Color.ink))
                 }
@@ -213,7 +213,7 @@ struct QuickNoteView: View {
                 }
                 .buttonStyle(.plain)
                 Button { save(p) } label: {
-                    Text(LF("Dodaj (%d)", pick.count)).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                    Text(LF("Dodaj (%d)", pick.count)).font(.system(size: 13, weight: .semibold)).foregroundStyle(Color.onInk)
                         .padding(.horizontal, 14).padding(.vertical, 7).background(Capsule().fill(Color.ink))
                 }
                 .buttonStyle(.plain).keyboardShortcut(.defaultAction)

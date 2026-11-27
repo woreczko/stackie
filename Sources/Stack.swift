@@ -598,10 +598,10 @@ extension FilterView {
                         HStack(spacing: 4) {
                             if let dot { Circle().fill(dot(t.tag)).frame(width: 7, height: 7) }
                             Text(t.tag)
-                            Text("\(t.count)").foregroundStyle(active ? Color.ink.opacity(0.6) : .secondary)
+                            Text("\(t.count)").foregroundStyle(active ? Color.inkFixed.opacity(0.6) : .secondary)
                         }
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(active ? Color.ink : .primary)
+                        .foregroundStyle(active ? Color.inkFixed : .primary)
                         .padding(.horizontal, 9).frame(height: 24)
                         .background(Capsule().fill(active ? PriorityIcon.yellow : Color.primary.opacity(0.08)))
                     }
@@ -735,7 +735,7 @@ struct StackRoot: View {
                     .overlay(alignment: .topLeading) {
                         if dropping {
                             Label(L("Upuść, a zrobię z tego karteczkę"), systemImage: "plus.square.on.square")
-                                .font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
+                                .font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.onInk)
                                 .padding(.horizontal, 12).frame(height: 30)
                                 .background(Capsule().fill(Color.ink.opacity(0.85)))
                                 .padding(.leading, StackLayout.padX * k).padding(.top, 4)
@@ -826,6 +826,7 @@ struct SettingsView: View {
     @State private var proOpen = false
     @State private var hotkey = Hotkey.choice
     @State private var mcpNote: String?
+    @State private var theme = Theme.mode
     @State private var opacity = UIState.shared.restOpacity
     @State private var login = SMAppService.mainApp.status == .enabled
 
@@ -835,6 +836,10 @@ struct SettingsView: View {
             row(L("Położenie stosu")) {
                 PillPicker(selection: $level, options: [(L("Pulpit"), 0), (L("Okno"), 1), (L("Na wierzchu"), 2)])
                 .onChange(of: level) { _, v in AppDelegate.shared?.levelMode = v }
+            }
+            row(L("Wygląd")) {
+                PillPicker(selection: $theme, options: [(L("Systemowy"), 0), (L("Jasny"), 1), (L("Ciemny"), 2)])
+                    .onChange(of: theme) { _, v in Theme.mode = v; DispatchQueue.main.async { AppDelegate.shared?.applyTheme() } }
             }
             row(L("Karteczki")) {
                 PillPicker(selection: $mini, options: [(L("Pełne"), false), (L("Małe: tytuł i data"), true)])
@@ -1133,7 +1138,7 @@ struct TrashView: View {
                     VStack(spacing: 6) {
                         ForEach(store.trash) { n in
                             HStack(spacing: 10) {
-                                RoundedRectangle(cornerRadius: 3).fill(palette(n.color).bg)
+                                RoundedRectangle(cornerRadius: 3).fill(accent(n.color))
                                     .overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(.black.opacity(0.1)))
                                     .frame(width: 6, height: 30)
                                 VStack(alignment: .leading, spacing: 1) {

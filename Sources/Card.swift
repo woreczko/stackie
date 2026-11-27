@@ -213,7 +213,7 @@ struct TagPill: View {
             if removable { Image(systemName: "xmark").font(.system(size: 5.5, weight: .semibold)).opacity(0.6) }
         }
         .font(.system(size: 7.5, weight: .medium))
-        .foregroundStyle(dark ? Color.ink : bg)
+        .foregroundStyle(dark ? Color.inkFixed : bg)
         .fixedSize()
         .padding(.horizontal, 5).padding(.vertical, 1.5)
         .background {
@@ -260,7 +260,7 @@ struct DuePill: View {
 
     var body: some View {
         let bg: Color = level == 3 ? Color(hex: 0xD93A26) : level == 2 ? fg : fg.opacity(level == 1 ? 0.16 : 0.08)
-        let tx: Color = level >= 2 ? (fg == .white && level == 2 ? .ink : .white) : fg.opacity(0.85)
+        let tx: Color = level >= 2 ? (fg == .white && level == 2 ? .inkFixed : .white) : fg.opacity(0.85)
         // wielkimi literami, jak tagi
         Text(text.uppercased())
             .font(.system(size: 8, weight: .semibold))
@@ -375,7 +375,7 @@ struct TodayCard: View {
         .padding(EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12))
         .frame(width: 150, height: 116, alignment: .topLeading)
         .background(
-            RoundedRectangle(cornerRadius: 11, style: .continuous).fill(Color.white)
+            RoundedRectangle(cornerRadius: 11, style: .continuous).fill(Color.paperWhite)
                 .shadow(color: .black.opacity(lifted ? 0.28 : 0.16), radius: lifted ? 14 : 6, x: 0, y: lifted ? 8 : 3)
         )
         .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).strokeBorder(.black.opacity(0.07), lineWidth: 1))
@@ -481,7 +481,7 @@ struct TodayCard: View {
         .padding(EdgeInsets(top: 14, leading: 16, bottom: 15, trailing: 16))
         .frame(width: StackLayout.fullW, height: StackLayout.fullH, alignment: .topLeading)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white)
+            RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.paperWhite)
                 .shadow(color: .black.opacity(lifted ? 0.28 : 0.16), radius: lifted ? 16 : 7, x: 0, y: lifted ? 10 : 3)
         )
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.black.opacity(0.07), lineWidth: 1))

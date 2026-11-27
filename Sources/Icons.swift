@@ -71,7 +71,7 @@ struct CheckCircle: View {
             if done {
                 Circle().fill(color)
                 Image(systemName: "checkmark").font(.system(size: size * 0.5, weight: .heavy))
-                    .foregroundStyle(color == .white ? Color.ink : .white)
+                    .foregroundStyle(color == .white ? Color.inkFixed : .white)
             }
         }
         .frame(width: size, height: size)

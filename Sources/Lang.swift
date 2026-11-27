@@ -167,6 +167,7 @@ let EN: [String: String] = [
     "Beata dzwoniła, reklama do ELLE na piątek!! logo od Kampa": "Beata called, ELLE ad for Friday!! logo from Kamp",
     "Przeniesiono do: %@": "Moved to: %@", "Skopiowano do: %@": "Copied to: %@",
     "Archiwum": "Archive",
+    "Wygląd": "Appearance", "Systemowy": "System", "Jasny": "Light", "Ciemny": "Dark",
     "Połączenie z Claude (MCP)": "Connect to Claude (MCP)", "Kopiuj dla Claude Code": "Copy for Claude Code", "Kopiuj dla Claude Desktop": "Copy for Claude Desktop",
     "Skopiowane. Wklej w Terminalu i naciśnij Enter.": "Copied. Paste it in Terminal and press Return.",
     "Skopiowane. Dopisz do claude_desktop_config.json w sekcji mcpServers.": "Copied. Add it to claude_desktop_config.json under mcpServers.",

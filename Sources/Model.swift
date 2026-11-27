@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import UserNotifications
 
 // MARK: - Dane
@@ -125,12 +126,34 @@ struct Seg: Hashable { let key: String; let color: Color; let label: String }
 
 struct NoteColor { let name: String; let bg: Color; let dark: Bool }
 
+/// Wygląd: systemowy, jasny albo ciemny (ciemne karteczki w kolorze, jasny tekst).
+enum Theme {
+    /// 0 systemowy, 1 jasny, 2 ciemny
+    static var mode: Int {
+        get { ProcessInfo.processInfo.environment["STOSIK_THEME"].map { $0 == "dark" ? 2 : 1 } ?? UserDefaults.standard.integer(forKey: "theme") }
+        set { UserDefaults.standard.set(newValue, forKey: "theme"); refresh() }
+    }
+    /// Liczone raz na zmianę (czytane przy każdym rysowaniu karteczek).
+    private(set) static var dark = false
+    static func refresh() {
+        dark = mode == 2 || (mode == 0 && UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark")
+    }
+    static var appearance: NSAppearance? { NSAppearance(named: dark ? .darkAqua : .aqua) }
+}
+
 extension Color {
     init(hex: UInt32) {
         self.init(.sRGB, red: Double((hex >> 16) & 255) / 255, green: Double((hex >> 8) & 255) / 255,
                   blue: Double(hex & 255) / 255, opacity: 1)
     }
-    static let ink = Color(hex: 0x26221F)
+    /// Tekst: ciemny w jasnym wyglądzie, jasny w ciemnym.
+    static var ink: Color { Theme.dark ? Color(hex: 0xEDE8E1) : Color(hex: 0x26221F) }
+    /// Zawsze ciemny (okienko powitalne ma własny, jasny wygląd).
+    static let inkFixed = Color(hex: 0x26221F)
+    /// Tekst na wypełnieniu w kolorze `ink` (np. czarny przycisk z białym napisem).
+    static var onInk: Color { Theme.dark ? Color(hex: 0x1E1D22) : .white }
+    /// Biała kartka „Na dziś” (w ciemnym wyglądzie grafitowa).
+    static var paperWhite: Color { Theme.dark ? Color(hex: 0x3A393F) : .white }
 }
 
 let PALETTE: [NoteColor] = [
@@ -146,7 +169,17 @@ let PALETTE: [NoteColor] = [
     NoteColor(name: "Grafit", bg: Color(hex: 0x2D2C31), dark: true),
 ]
 
-func palette(_ i: Int) -> NoteColor { PALETTE[max(0, min(PALETTE.count - 1, i))] }
+/// Ten sam kolor w ciemnym wyglądzie: przygaszony odcień z jasnym tekstem.
+let DARK_PALETTE: [UInt32] = [0x3D3933, 0x58364A, 0x5C3624, 0x55492A, 0x434E27, 0x2A4C40, 0x284A5C, 0x3D3763, 0x612B23, 0x1C1B20]
+
+/// Jasny kolor karteczki do kropek, pasków i pierścieni (także w ciemnym wyglądzie, żeby było je widać).
+func accent(_ i: Int) -> Color { PALETTE[max(0, min(PALETTE.count - 1, i))].bg }
+
+func palette(_ i: Int) -> NoteColor {
+    let k = max(0, min(PALETTE.count - 1, i))
+    if Theme.dark { return NoteColor(name: PALETTE[k].name, bg: Color(hex: DARK_PALETTE[k]), dark: true) }
+    return PALETTE[k]
+}
 
 // MARK: - Terminy
 
@@ -401,8 +434,8 @@ final class Store: ObservableObject {
     }
 
     func tagColor(_ t: String, kind: String = "") -> Color {
-        if let i = tagColors[kind + t.lowercased()] { return palette(i).bg }
-        return palette(Store.TAG_ORDER[abs(t.lowercased().hashValue) % 8]).bg
+        if let i = tagColors[kind + t.lowercased()] { return accent(i) }
+        return accent(Store.TAG_ORDER[abs(t.lowercased().hashValue) % 8])
     }
     func clientColor(_ c: String) -> Color { tagColor(c, kind: "c:") }
 
@@ -437,7 +470,7 @@ final class Store: ObservableObject {
                 else { s = Seg(key: "", color: Color(hex: 0xB9B5AE), label: L("bez klienta")) }
             case .project:
                 if !n.project.isEmpty { s = Seg(key: "p:" + n.project.lowercased(), color: tagColor(n.project, kind: "p:"), label: n.project) }
-                else { s = Seg(key: n.id.uuidString, color: palette(n.color).bg, label: n.title.isEmpty ? L("Bez tytułu") : n.title) }
+                else { s = Seg(key: n.id.uuidString, color: accent(n.color), label: n.title.isEmpty ? L("Bez tytułu") : n.title) }
             case .tag:
                 if let t = n.tags.first { s = Seg(key: t.lowercased(), color: tagColor(t), label: t) }
                 else { s = Seg(key: "", color: Color(hex: 0xB9B5AE), label: L("bez tagu")) }

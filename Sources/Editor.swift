@@ -345,7 +345,7 @@ struct EditorView: View {
                         Image(systemName: sendCopy ? "doc.on.doc" : "arrowshape.turn.up.right").font(.system(size: 10, weight: .bold))
                         Text(sentInfo).font(.system(size: 12, weight: .semibold)).lineLimit(1)
                     }
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.onInk)
                     .padding(.horizontal, 12).frame(height: 28)
                     .background(Capsule().fill(Color.ink.opacity(0.88)))
                     .shadow(color: .black.opacity(0.2), radius: 6, y: 3)
@@ -376,7 +376,7 @@ struct EditorView: View {
                     Text("OK").font(.system(size: 12, weight: .semibold))
                         .padding(.horizontal, 18).padding(.vertical, 7)
                         .background(Capsule().fill(fg))
-                        .foregroundStyle(pal.dark ? Color.ink : .white)
+                        .foregroundStyle(pal.dark ? Color.inkFixed : .white)
                 }
                 .buttonStyle(.plain).keyboardShortcut(.return, modifiers: .command)
             }
@@ -766,7 +766,7 @@ struct TagEditor: View {
                     Image(systemName: "xmark").font(.system(size: 6, weight: .bold)).opacity(0.6)
                 }
                 .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(dark ? Color.ink : bg)
+                .foregroundStyle(dark ? Color.inkFixed : bg)
                 .fixedSize()
                 .padding(.horizontal, 8).frame(height: 17)
                 .background(Capsule().fill(dark ? Color(hex: 0xF7F1E7).opacity(0.9) : Color.ink.opacity(0.8)))
@@ -1164,7 +1164,7 @@ struct NotePicker: View {
                         ForEach(g.notes) { n in
                             Button { pick(n.id) } label: {
                                 HStack(spacing: 8) {
-                                    RoundedRectangle(cornerRadius: 3).fill(palette(n.color).bg)
+                                    RoundedRectangle(cornerRadius: 3).fill(accent(n.color))
                                         .overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(.black.opacity(0.15)))
                                         .frame(width: 12, height: 14)
                                     VStack(alignment: .leading, spacing: 1) {

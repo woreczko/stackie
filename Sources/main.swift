@@ -106,6 +106,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     func applicationDidFinishLaunching(_ n: Notification) {
         AppDelegate.shared = self
         Lang.resolve()
+        Theme.refresh()
         if ProcessInfo.processInfo.environment["STOSIK_SPOTLIGHT_CHECK"] != nil {
             Spotlight.check { DispatchQueue.main.async { NSApp.terminate(nil) } }
             return
@@ -118,6 +119,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         store.$notes.receive(on: RunLoop.main).sink { [weak self] _ in
             self?.resizeStack(); self?.updateStatusTitle()
         }.store(in: &bag)
+        // wygląd „Systemowy”: przełączenie jasny/ciemny w macOS
+        DistributedNotificationCenter.default().addObserver(forName: Notification.Name("AppleInterfaceThemeChangedNotification"),
+                                                            object: nil, queue: .main) { [weak self] _ in
+            if Theme.mode == 0 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self?.applyTheme() } }
+        }
         // skrót w całym systemie: szybka notatka od razu z dyktowaniem (nie w testach ze zrzutami)
         if ProcessInfo.processInfo.environment["STOSIK_SNAP"] == nil { Hotkey.install { [weak self] in self?.showQuickNote(dictate: true) } }
         // zmiany od Claude (MCP) przychodzą do działającej apki
@@ -307,7 +313,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         p.hidesOnDeactivate = false; p.isMovableByWindowBackground = true
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         p.level = .floating
-        p.appearance = NSAppearance(named: .aqua)
+        p.appearance = Theme.appearance
         let host = NSHostingView(rootView: QuickNoteView(close: { [weak self] in
             self?.quickWin?.orderOut(nil); self?.quickWin?.contentView = nil
         }, dictate: dictate))
@@ -340,7 +346,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             p.hidesOnDeactivate = false
             p.isMovableByWindowBackground = true
             p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-            p.appearance = NSAppearance(named: .aqua)
+            p.appearance = Theme.appearance
             editor = p
         }
         guard let editor else { return }
@@ -371,7 +377,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             p.isOpaque = false; p.backgroundColor = .clear; p.hasShadow = true
             p.hidesOnDeactivate = false; p.isMovableByWindowBackground = true
             p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-            p.appearance = NSAppearance(named: .aqua)
+            p.appearance = Theme.appearance
             let host = NSHostingView(rootView: CalendarView(
                 close: { [weak self] in self?.calendar?.orderOut(nil) },
                 open: { [weak self] id in
@@ -503,7 +509,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             p.isOpaque = false; p.backgroundColor = .clear; p.hasShadow = true
             p.hidesOnDeactivate = false; p.isMovableByWindowBackground = true
             p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-            p.appearance = NSAppearance(named: .aqua)
+            p.appearance = Theme.appearance
             let host = NSHostingView(rootView: TrashView(close: { [weak self] in self?.trashWin?.orderOut(nil) }).environmentObject(store))
             host.sizingOptions = []
             p.contentView = host
@@ -704,6 +710,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 
     /// Nowy język od razu: stos, otwarte okna i przypomnienia dostają nowe napisy.
+    /// Zmiana wyglądu (ustawienia albo system przy „Systemowy”): przerysuj stos i okienka.
+    func applyTheme() {
+        Theme.refresh()
+        for w in [editor, calendar, trashWin, quickWin] { w?.appearance = Theme.appearance }
+        relocalize()
+    }
+
     func relocalize() {
         let editingID = editor?.isVisible == true ? editorID : nil
         let calOpen = calendar?.isVisible == true

@@ -66,13 +66,13 @@ struct WelcomeView: View {
             }
             .frame(height: page < pages.count ? 260 : 380)
             .frame(maxWidth: .infinity)
-            .background(page < pages.count ? Color(hex: 0x1F1E23) : CAL_PAPER)
+            .background(page < pages.count ? Color(hex: 0x1F1E23) : PAPER_FIXED)
             .clipped()
 
             if page < pages.count {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(pages[page].title).font(.system(size: 24, weight: .semibold)).tracking(-0.5)
-                    Text(pages[page].text).font(.system(size: 13.5)).foregroundStyle(Color.ink.opacity(0.7))
+                    Text(pages[page].text).font(.system(size: 13.5)).foregroundStyle(Color.inkFixed.opacity(0.7))
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -81,13 +81,13 @@ struct WelcomeView: View {
             Spacer(minLength: 0)
             HStack(spacing: 6) {
                 ForEach(0..<all, id: \.self) { i in
-                    Capsule().fill(Color.ink.opacity(i == page ? 0.8 : 0.15)).frame(width: i == page ? 18 : 6, height: 6)
+                    Capsule().fill(Color.inkFixed.opacity(i == page ? 0.8 : 0.15)).frame(width: i == page ? 18 : 6, height: 6)
                         .onTapGesture { withAnimation(.spring(response: 0.35)) { page = i } }
                 }
                 Spacer()
                 if page > 0 {
                     Button(L("Wstecz")) { withAnimation(.spring(response: 0.35)) { page -= 1 } }
-                        .buttonStyle(.plain).font(.system(size: 13, weight: .medium)).foregroundStyle(Color.ink.opacity(0.6))
+                        .buttonStyle(.plain).font(.system(size: 13, weight: .medium)).foregroundStyle(Color.inkFixed.opacity(0.6))
                         .padding(.trailing, 10)
                 }
                 Button {
@@ -95,15 +95,15 @@ struct WelcomeView: View {
                 } label: {
                     Text(page < all - 1 ? L("Dalej") : L("Zaczynamy"))
                         .font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
-                        .padding(.horizontal, 18).frame(height: 32).background(Capsule().fill(Color.ink))
+                        .padding(.horizontal, 18).frame(height: 32).background(Capsule().fill(Color.inkFixed))
                 }
                 .buttonStyle(.plain).keyboardShortcut(.defaultAction)
             }
             .padding(EdgeInsets(top: 12, leading: 26, bottom: 20, trailing: 22))
         }
-        .foregroundStyle(Color.ink)
+        .foregroundStyle(Color.inkFixed)
         .frame(width: 560, height: 470)
-        .background(CAL_PAPER)
+        .background(PAPER_FIXED)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(.black.opacity(0.12)))
         .overlay(alignment: .topTrailing) {
@@ -168,7 +168,7 @@ struct Changelog: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(L("Co nowego")).font(.system(size: 24, weight: .semibold)).tracking(-0.5)
-            Text(LF("Wersja %@", APP_VERSION)).font(.system(size: 12)).foregroundStyle(Color.ink.opacity(0.5)).padding(.bottom, 12)
+            Text(LF("Wersja %@", APP_VERSION)).font(.system(size: 12)).foregroundStyle(Color.inkFixed.opacity(0.5)).padding(.bottom, 12)
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     ForEach(RELEASES, id: \.version) { r in
@@ -176,13 +176,13 @@ struct Changelog: View {
                             HStack(alignment: .firstTextBaseline, spacing: 8) {
                                 Text(r.version).font(.system(size: 13, weight: .bold))
                                     .padding(.horizontal, 8).padding(.vertical, 2)
-                                    .background(Capsule().fill(r.version == APP_VERSION ? PriorityIcon.yellow : Color.ink.opacity(0.07)))
-                                Text(r.date).font(.system(size: 11)).foregroundStyle(Color.ink.opacity(0.45))
+                                    .background(Capsule().fill(r.version == APP_VERSION ? PriorityIcon.yellow : Color.inkFixed.opacity(0.07)))
+                                Text(r.date).font(.system(size: 11)).foregroundStyle(Color.inkFixed.opacity(0.45))
                             }
                             ForEach(r.items, id: \.self) { it in
                                 HStack(alignment: .top, spacing: 8) {
-                                    Circle().fill(Color.ink.opacity(0.35)).frame(width: 4, height: 4).padding(.top, 6)
-                                    Text(it).font(.system(size: 12.5)).foregroundStyle(Color.ink.opacity(0.8))
+                                    Circle().fill(Color.inkFixed.opacity(0.35)).frame(width: 4, height: 4).padding(.top, 6)
+                                    Text(it).font(.system(size: 12.5)).foregroundStyle(Color.inkFixed.opacity(0.8))
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
                             }
@@ -249,10 +249,10 @@ struct MiniCalendarCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(monthName(Calendar.current.component(.month, from: Date())))
-                .font(.system(size: w * 0.085, weight: .semibold)).foregroundStyle(Color.ink)
+                .font(.system(size: w * 0.085, weight: .semibold)).foregroundStyle(Color.inkFixed)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 7), spacing: 3) {
                 ForEach(0..<28, id: \.self) { i in
-                    Circle().fill(i == 19 ? PriorityIcon.purple : Color.ink.opacity(0.1)).frame(width: w * 0.055, height: w * 0.055)
+                    Circle().fill(i == 19 ? PriorityIcon.purple : Color.inkFixed.opacity(0.1)).frame(width: w * 0.055, height: w * 0.055)
                 }
             }
             Spacer(minLength: 0)
@@ -320,13 +320,13 @@ struct DemoReminder: View {
                 .offset(x: -80, y: 8 + hop)
 
                 HStack(spacing: 8) {
-                    RoundedRectangle(cornerRadius: 5).fill(palette(2).bg).frame(width: 22, height: 22)
+                    RoundedRectangle(cornerRadius: 5).fill(accent(2)).frame(width: 22, height: 22)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(L("Jutro termin: Prezentacja")).font(.system(size: 11, weight: .semibold))
                         Text(L("Zostało zadań: 2 z 3.")).font(.system(size: 10)).opacity(0.6)
                     }
                 }
-                .foregroundStyle(Color.ink)
+                .foregroundStyle(Color.inkFixed)
                 .padding(10).frame(width: 220, alignment: .leading)
                 .background(RoundedRectangle(cornerRadius: 12).fill(.white.opacity(0.95)))
                 .offset(x: 120 + 260 * (1 - banner), y: 60)
@@ -344,10 +344,10 @@ struct DemoFilter: View {
                 HStack(spacing: 8) {
                     ForEach(Array(["Studio Nova", "Kawiarnia", "#logo"].enumerated()), id: \.offset) { i, n in
                         HStack(spacing: 4) {
-                            if i < 2 { Circle().fill(i == 0 ? palette(5).bg : palette(7).bg).frame(width: 7, height: 7) }
+                            if i < 2 { Circle().fill(i == 0 ? accent(5) : accent(7)).frame(width: 7, height: 7) }
                             Text(n).font(.system(size: 11, weight: .medium))
                         }
-                        .foregroundStyle(i == 0 && on > 0.5 ? Color.ink : .white)
+                        .foregroundStyle(i == 0 && on > 0.5 ? Color.inkFixed : .white)
                         .padding(.horizontal, 10).frame(height: 24)
                         .background(Capsule().fill(i == 0 && on > 0.5 ? PriorityIcon.yellow : Color.white.opacity(0.12)))
                     }
@@ -371,9 +371,9 @@ struct DemoCalendar: View {
     var body: some View {
         Loop(period: 4) { t in
             let p = ease(t, 0.05, 0.6)
-            let segs: [[Color]] = [[palette(5).bg], [palette(5).bg, palette(7).bg], [], [palette(2).bg, palette(5).bg, palette(7).bg],
-                                   [palette(7).bg], [], [palette(2).bg], [palette(5).bg, palette(2).bg], [], [palette(7).bg],
-                                   [palette(5).bg], [palette(2).bg, palette(7).bg], [], [palette(5).bg]]
+            let segs: [[Color]] = [[accent(5)], [accent(5), accent(7)], [], [accent(2), accent(5), accent(7)],
+                                   [accent(7)], [], [accent(2)], [accent(5), accent(2)], [], [accent(7)],
+                                   [accent(5)], [accent(2), accent(7)], [], [accent(5)]]
             HStack(spacing: 30) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(monthName(Calendar.current.component(.month, from: Date()))).font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
@@ -535,7 +535,7 @@ struct Permissions: View {
         VStack(alignment: .leading, spacing: 0) {
             Text(L("Zgody")).font(.system(size: 24, weight: .semibold)).tracking(-0.5)
             Text(L("Stosik prosi tylko o to, czego potrzebuje. Możesz to zmienić w każdej chwili w Ustawieniach systemowych."))
-                .font(.system(size: 12)).foregroundStyle(Color.ink.opacity(0.55)).fixedSize(horizontal: false, vertical: true)
+                .font(.system(size: 12)).foregroundStyle(Color.inkFixed.opacity(0.55)).fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 16)
             row("bell.fill", L("Powiadomienia"), L("Przypomnienia o terminach (dzwoneczek w karteczce)."), notif,
                 ask: { Reminders.setup(); DispatchQueue.main.asyncAfter(deadline: .now() + 1) { refresh() } },
@@ -571,10 +571,10 @@ struct Permissions: View {
                      ask: @escaping () -> Void, settings: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon).font(.system(size: 14, weight: .semibold)).foregroundStyle(.white)
-                .frame(width: 34, height: 34).background(RoundedRectangle(cornerRadius: 9).fill(Color.ink))
+                .frame(width: 34, height: 34).background(RoundedRectangle(cornerRadius: 9).fill(Color.inkFixed))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.system(size: 13.5, weight: .semibold))
-                Text(why).font(.system(size: 11.5)).foregroundStyle(Color.ink.opacity(0.6)).fixedSize(horizontal: false, vertical: true)
+                Text(why).font(.system(size: 11.5)).foregroundStyle(Color.inkFixed.opacity(0.6)).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
             if state == "ok" {
@@ -583,15 +583,15 @@ struct Permissions: View {
             } else if state == "no" {
                 Button(L("Otwórz Ustawienia")) { if let u = URL(string: settings) { NSWorkspace.shared.open(u) } }
                     .buttonStyle(.plain).font(.system(size: 11.5, weight: .semibold))
-                    .padding(.horizontal, 10).frame(height: 26).background(Capsule().fill(Color.ink.opacity(0.08)))
+                    .padding(.horizontal, 10).frame(height: 26).background(Capsule().fill(Color.inkFixed.opacity(0.08)))
             } else {
                 Button(L("Zezwól"), action: ask)
                     .buttonStyle(.plain).font(.system(size: 11.5, weight: .semibold)).foregroundStyle(.white)
-                    .padding(.horizontal, 12).frame(height: 26).background(Capsule().fill(Color.ink))
+                    .padding(.horizontal, 12).frame(height: 26).background(Capsule().fill(Color.inkFixed))
             }
         }
         .padding(10)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.ink.opacity(0.04)))
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color.inkFixed.opacity(0.04)))
         .padding(.bottom, 8)
     }
 }
@@ -654,7 +654,7 @@ struct DemoSizes: View {
                 HStack(spacing: 6) {
                     ForEach(0..<4) { i in
                         Text(names[i]).font(.system(size: 11, weight: i == step ? .semibold : .medium))
-                            .foregroundStyle(i == step ? Color.ink : .white.opacity(0.7))
+                            .foregroundStyle(i == step ? Color.inkFixed : .white.opacity(0.7))
                             .padding(.horizontal, 10).padding(.vertical, 4)
                             .background(Capsule().fill(i == step ? Color.white : .white.opacity(0.12)))
                     }
@@ -684,22 +684,22 @@ struct DemoCorner: View {
                 // okienko szybkiej notatki na środku
                 VStack(alignment: .leading, spacing: 7) {
                     Text(L("Szybka notatka")).font(.system(size: 7.5, weight: .bold)).tracking(0.6).textCase(.uppercase)
-                        .foregroundStyle(Color.ink.opacity(0.5))
-                    Text(typed).font(.system(size: 10.5)).foregroundStyle(Color.ink.opacity(0.85))
+                        .foregroundStyle(Color.inkFixed.opacity(0.5))
+                    Text(typed).font(.system(size: 10.5)).foregroundStyle(Color.inkFixed.opacity(0.85))
                         .frame(width: 236, height: 46, alignment: .topLeading)
                     HStack(spacing: 5) {
                         Label(L("Dyktuj"), systemImage: "mic.fill").font(.system(size: 8, weight: .semibold)).lineLimit(1).fixedSize()
-                            .padding(.horizontal, 7).padding(.vertical, 4).background(Capsule().fill(Color.ink.opacity(0.08)))
+                            .padding(.horizontal, 7).padding(.vertical, 4).background(Capsule().fill(Color.inkFixed.opacity(0.08)))
                         Spacer()
                         Text(L("Zapisz na brudno")).font(.system(size: 8, weight: .semibold)).lineLimit(1).fixedSize()
-                            .padding(.horizontal, 7).padding(.vertical, 4).background(Capsule().fill(Color.ink.opacity(0.08)))
+                            .padding(.horizontal, 7).padding(.vertical, 4).background(Capsule().fill(Color.inkFixed.opacity(0.08)))
                         HStack(spacing: 3) { Image(systemName: "sparkles"); Text(L("Zrób zadania")) }.lineLimit(1).fixedSize()
                             .font(.system(size: 8, weight: .semibold)).foregroundStyle(.white)
-                            .padding(.horizontal, 8).padding(.vertical, 4).background(Capsule().fill(Color.ink))
+                            .padding(.horizontal, 8).padding(.vertical, 4).background(Capsule().fill(Color.inkFixed))
                             .scaleEffect(1 + 0.12 * press)
                             .shadow(color: Color(hex: 0x8B7CF6).opacity(0.9 * press), radius: 8)
                     }
-                    .foregroundStyle(Color.ink)
+                    .foregroundStyle(Color.inkFixed)
                 }
                 .padding(11)
                 .frame(width: 260)
@@ -732,7 +732,7 @@ struct DemoMove: View {
                         .shadow(color: .black.opacity(0.3), radius: 8, y: 4).rotationEffect(.degrees(2.5))
                 }
                 // menu przy zadaniu
-                Text(L("Przenieś na inną karteczkę…")).font(.system(size: 9, weight: .medium)).foregroundStyle(Color.ink)
+                Text(L("Przenieś na inną karteczkę…")).font(.system(size: 9, weight: .medium)).foregroundStyle(Color.inkFixed)
                     .padding(.horizontal, 8).padding(.vertical, 5)
                     .background(RoundedRectangle(cornerRadius: 6).fill(.white))
                     .shadow(color: .black.opacity(0.3), radius: 6, y: 3)
@@ -740,8 +740,8 @@ struct DemoMove: View {
                     .offset(x: -40, y: 40)
                 // lecące zadanie
                 HStack(spacing: 5) {
-                    Circle().strokeBorder(Color.ink.opacity(0.6), lineWidth: 1.2).frame(width: 9, height: 9)
-                    Text(task).font(.system(size: 9.5, weight: .medium)).foregroundStyle(Color.ink)
+                    Circle().strokeBorder(Color.inkFixed.opacity(0.6), lineWidth: 1.2).frame(width: 9, height: 9)
+                    Text(task).font(.system(size: 9.5, weight: .medium)).foregroundStyle(Color.inkFixed)
                 }
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(Capsule().fill(.white))
@@ -770,19 +770,19 @@ struct DemoSmart: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text(L("Notatka")).font(.system(size: 9, weight: .bold)).tracking(0.7).textCase(.uppercase)
-                            .foregroundStyle(Color.ink.opacity(0.55))
+                            .foregroundStyle(Color.inkFixed.opacity(0.55))
                         Spacer()
                         HStack(spacing: 4) {
                             Image(systemName: "sparkles").font(.system(size: 8.5, weight: .bold))
                             Text(L("Zrób zadania")).font(.system(size: 10, weight: .semibold))
                         }
-                        .foregroundStyle(Color.ink.opacity(0.6 + 0.4 * press))
+                        .foregroundStyle(Color.inkFixed.opacity(0.6 + 0.4 * press))
                         .padding(.horizontal, 7).padding(.vertical, 3)
                         .background(Capsule().fill(Color(hex: 0x8B7CF6).opacity(0.15 + 0.5 * press)))
                         .scaleEffect(1 + 0.12 * press)
                         .shadow(color: Color(hex: 0x8B7CF6).opacity(0.8 * press), radius: 8)
                     }
-                    Text(typed).font(.system(size: 12.5, design: .rounded)).foregroundStyle(Color.ink.opacity(0.85))
+                    Text(typed).font(.system(size: 12.5, design: .rounded)).foregroundStyle(Color.inkFixed.opacity(0.85))
                         .frame(width: 180, height: 110, alignment: .topLeading)
                 }
                 .padding(12)
