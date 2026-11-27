@@ -2,3 +2,6 @@ build/
 test/
 wersje/
 .DS_Store
+DerivedData/
+kopie/
+*.xcodeproj/
