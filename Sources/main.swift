@@ -120,6 +120,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }.store(in: &bag)
         // skrót w całym systemie: szybka notatka od razu z dyktowaniem (nie w testach ze zrzutami)
         if ProcessInfo.processInfo.environment["STOSIK_SNAP"] == nil { Hotkey.install { [weak self] in self?.showQuickNote(dictate: true) } }
+        // zmiany od Claude (MCP) przychodzą do działającej apki
+        if ProcessInfo.processInfo.environment["STOSIK_SNAP"] == nil { MCP.listen(store: store) }
         // Spotlight: po chwili spokoju (nie przy każdej literze)
         store.$notes.debounce(for: .seconds(1.5), scheduler: RunLoop.main).sink { Spotlight.update($0) }.store(in: &bag)
         ui.$filterTag.combineLatest(ui.$query, ui.$filterClient, ui.$filterProject).receive(on: RunLoop.main).sink { [weak self] _ in
@@ -959,6 +961,8 @@ if let out = ProcessInfo.processInfo.environment["STOSIK_ICON"] {
     }
     exit(0)
 }
+// serwer MCP dla Claude Code / Claude Desktop: bez okien, tylko stdin/stdout
+if CommandLine.arguments.contains("--mcp") { MCP.serve() }
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate

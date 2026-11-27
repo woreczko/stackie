@@ -825,6 +825,7 @@ struct SettingsView: View {
     @State private var password = ""
     @State private var proOpen = false
     @State private var hotkey = Hotkey.choice
+    @State private var mcpNote: String?
     @State private var opacity = UIState.shared.restOpacity
     @State private var login = SMAppService.mainApp.status == .enabled
 
@@ -904,6 +905,14 @@ struct SettingsView: View {
                     .font(.system(size: 10.5)).foregroundStyle(keyNote == nil ? Color.secondary : Color.red)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            row(L("Połączenie z Claude (MCP)")) {
+                FlowLayout(spacing: 6) {
+                    smallPill(L("Kopiuj dla Claude Code")) { copy(MCPSetup.claudeCode); mcpNote = L("Skopiowane. Wklej w Terminalu i naciśnij Enter.") }
+                    smallPill(L("Kopiuj dla Claude Desktop")) { copy(MCPSetup.desktop); mcpNote = L("Skopiowane. Dopisz do claude_desktop_config.json w sekcji mcpServers.") }
+                }
+                Text(mcpNote ?? L("Claude czyta karteczki i dopisuje zadania, np. „dodaj do NTN: wysłać pliki do druku”."))
+                    .font(.system(size: 10.5)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
             row(L("Język")) {
                 PillPicker(selection: $lang, options: [(L("Auto"), "auto"), ("Polski", "pl"), ("English", "en")])
                 .onChange(of: lang) { _, v in
@@ -978,6 +987,10 @@ struct SettingsView: View {
         if hasKey { return L("„Zrób zadania” pyta Claude (Haiku): najlepiej rozumie chaotyczne notatki, także po polsku.") }
         if AppleAI.available { return L("„Zrób zadania” liczy Apple Intelligence na tym Macu, prywatnie i bez internetu.") }
         return L("Notatka dzieli się po czasownikach.") + " " + AppleAI.reason
+    }
+
+    private func copy(_ t: String) {
+        NSPasteboard.general.clearContents(); NSPasteboard.general.setString(t, forType: .string)
     }
 
     private func unlock() {
@@ -1164,4 +1177,12 @@ struct TrashView: View {
             Button(L("Anuluj"), role: .cancel) {}
         }
     }
+}
+
+
+/// Gotowe polecenia do podłączenia Stackie jako serwera MCP.
+enum MCPSetup {
+    static var exe: String { Bundle.main.executablePath ?? "/Applications/Stosik.app/Contents/MacOS/Stosik" }
+    static var claudeCode: String { "claude mcp add --scope user stackie -- \"\(exe)\" --mcp" }
+    static var desktop: String { "\"stackie\": { \"command\": \"\(exe)\", \"args\": [\"--mcp\"] }" }
 }
