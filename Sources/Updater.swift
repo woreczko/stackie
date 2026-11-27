@@ -2,11 +2,18 @@ import AppKit
 import Security
 import UserNotifications
 
-/// Aktualizacje z GitHuba: raz dziennie sprawdza najnowsze wydanie, pobiera je w tle,
+/// Aktualizacje z GitHuba: przy starcie oraz o 10:37 i 21:37 sprawdza najnowsze wydanie, pobiera je w tle,
 /// sprawdza podpis (Developer ID tego samego zespołu, co działająca apka) i podmienia apkę,
 /// gdy nikt jej nie używa albo przy zamykaniu. Karteczki leżą osobno i nic się z nimi nie dzieje.
-final class Updater {
+final class Updater: ObservableObject {
     static let shared = Updater()
+
+    /// Stan widoczny w ustawieniach (sprawdzanie z palca).
+    enum Status: Equatable { case idle, checking, upToDate, downloading(String), ready(String), failed, unsigned }
+    @Published private(set) var status: Status = .idle
+    /// Sprawdzenie z palca: po pobraniu od razu podmiana i ponowne uruchomienie (menu w pasku).
+    private var installWhenReady = false
+    private func set(_ s: Status) { DispatchQueue.main.async { self.status = s } }
     static let repo = "woreczko/stackie"
 
     /// Włączone w menu (domyślnie tak).
@@ -46,19 +53,43 @@ final class Updater {
         let now = ProcessInfo.processInfo.environment["STOSIK_UPDATE_NOW"] != nil   // test: od razu, bez czekania na bezczynność
         if now { idleNeeded = 0 }
         DispatchQueue.main.asyncAfter(deadline: .now() + (now ? 2 : 60)) { self.check() }
-        // co godzinę: sprawdzenie raz na dobę (zegar nie liczy, gdy Mac śpi), podmiana, gdy nikt nie używa apki
-        timer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in
+        // co minutę: sprawdzenie o 10:37 i 21:37 (gdy Mac wtedy spał, zaraz po wybudzeniu), podmiana, gdy nikt nie używa apki
+        timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             guard let self else { return }
-            if Date().timeIntervalSince(self.lastCheck) > 20 * 3600 { self.check() }
+            if let due = Updater.lastSlot(before: Date()), self.lastCheck < due { self.check() }
             self.installIfIdle()
         }
     }
 
+    /// Stałe godziny sprawdzania.
+    static let slots = [(10, 37), (21, 37)]
+    /// Ostatnia minięta godzina sprawdzania (dziś albo wczoraj wieczorem).
+    static func lastSlot(before now: Date) -> Date? {
+        let cal = Calendar.current
+        let days = [now, cal.date(byAdding: .day, value: -1, to: now)!]
+        return days.flatMap { d in slots.compactMap { cal.date(bySettingHour: $0.0, minute: $0.1, second: 0, of: d) } }
+            .filter { $0 <= now }.max()
+    }
+
     // MARK: sprawdzenie i pobranie
 
-    func check() {
-        guard enabled, !busy, ready == nil, teamID != nil else { return }
+    /// Z palca: sprawdza od razu, także gdy samoczynne aktualizacje są wyłączone.
+    /// `install`: gdy nowa wersja jest gotowa, od razu ją instaluje i uruchamia ponownie.
+    func checkNow(install: Bool = false) {
+        guard teamID != nil else { status = .unsigned; return }
+        if install { installWhenReady = true }
+        if let r = ready {
+            status = .ready(r.version)
+            if installWhenReady { self.install(relaunch: true) }
+            return
+        }
+        check(force: true)
+    }
+
+    func check(force: Bool = false) {
+        guard enabled || force, !busy, ready == nil, teamID != nil else { return }
         busy = true
+        if force { set(.checking) }
         var req = URLRequest(url: URL(string: "https://api.github.com/repos/\(Updater.repo)/releases/latest")!)
         req.setValue("Stackie-updater", forHTTPHeaderField: "User-Agent")
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
@@ -68,16 +99,17 @@ final class Updater {
                   let tag = j["tag_name"] as? String,
                   let assets = j["assets"] as? [[String: Any]],
                   let zip = assets.first(where: { ($0["name"] as? String)?.hasSuffix(".zip") == true }),
-                  let link = (zip["browser_download_url"] as? String).flatMap(URL.init(string:)) else { return self.done() }
+                  let link = (zip["browser_download_url"] as? String).flatMap(URL.init(string:)) else { return self.done(.failed) }
             let version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
-            guard Updater.newer(version, than: APP_VERSION) else { return self.done() }
+            guard Updater.newer(version, than: APP_VERSION) else { return self.done(.upToDate) }
+            self.set(.downloading(version))
             self.download(link, version)
         }.resume()
     }
 
     private func download(_ link: URL, _ version: String) {
         URLSession.shared.downloadTask(with: link) { file, _, _ in
-            guard let file else { return self.done() }
+            guard let file else { return self.done(.failed) }
             let fm = FileManager.default
             let out = self.dir.appendingPathComponent(version)
             try? fm.removeItem(at: self.dir)
@@ -85,16 +117,27 @@ final class Updater {
             guard Updater.run("/usr/bin/ditto", ["-x", "-k", file.path, out.path]),
                   let app = (try? fm.contentsOfDirectory(at: out, includingPropertiesForKeys: nil))?.first(where: { $0.pathExtension == "app" }),
                   self.trusted(app) else {
-                try? fm.removeItem(at: self.dir); return self.done()
+                try? fm.removeItem(at: self.dir); return self.done(.failed)
             }
             DispatchQueue.main.async {
                 self.ready = (version, app); self.busy = false
-                self.installIfIdle()
+                self.status = .ready(version)
+                if self.installWhenReady { self.install(relaunch: true) } else { self.installIfIdle() }
             }
         }.resume()
     }
 
-    private func done() { DispatchQueue.main.async { self.busy = false } }
+    /// Koniec sprawdzania bez nowej wersji. Stan pokazujemy tylko, gdy ktoś sprawdzał z palca.
+    private func done(_ s: Status = .idle) {
+        DispatchQueue.main.async {
+            self.busy = false
+            if self.status != .idle { self.status = s }
+            if self.installWhenReady && s != .idle {
+                self.installWhenReady = false
+                AppDelegate.shared?.updateResult(s)
+            }
+        }
+    }
 
     /// Podpis Developer ID od Apple, ten sam zespół co działająca apka, nic nie zmienione po podpisaniu.
     private func trusted(_ app: URL) -> Bool {

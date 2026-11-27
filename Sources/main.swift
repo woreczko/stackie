@@ -562,6 +562,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             let up = item(L("Aktualizuj automatycznie"), #selector(menuAutoUpdate), "", "arrow.down.circle")
             up.state = Updater.shared.enabled ? .on : .off
             menu.addItem(up)
+            menu.addItem(item(LF("Sprawdź aktualizacje (masz %@)", APP_VERSION), #selector(menuCheckUpdate), "", "arrow.triangle.2.circlepath"))
         }
 
         // Na koniec
@@ -583,6 +584,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     @objc func menuTrash() { toggleTrash() }
     @objc func menuWelcome() { showWelcome() }
     @objc func menuAutoUpdate() { Updater.shared.enabled.toggle() }
+    /// Z menu: sprawdź teraz; nowa wersja instaluje się od razu (apka uruchamia się ponownie), inaczej krótkie powiadomienie.
+    @objc func menuCheckUpdate() { Updater.shared.checkNow(install: true) }
+    func updateResult(_ s: Updater.Status) {
+        let c = UNMutableNotificationContent()
+        switch s {
+        case .upToDate: c.title = LF("Masz najnowszą wersję (%@)", APP_VERSION)
+        case .failed: c.title = L("Nie udało się sprawdzić aktualizacji"); c.body = L("Sprawdź połączenie z internetem i spróbuj później.")
+        default: return
+        }
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "update-check", content: c, trigger: nil))
+    }
     /// Małe karteczki (np. na 13–14 cali): tylko tytuł, data i licznik; pełna treść w edytorze.
     @objc func menuMini() { setMini(!StackLayout.mini) }
     func setMini(_ on: Bool) {

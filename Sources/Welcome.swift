@@ -5,7 +5,7 @@ import UserNotifications
 
 // MARK: - Okienko powitalne: strony z animacjami możliwości i historia zmian
 
-let APP_VERSION = "1.3"
+let APP_VERSION = "1.4"
 
 /// `since`: wersja, w której funkcja się pojawiła (po aktualizacji pokazujemy tylko nowsze strony).
 struct WelcomePage { let title: String; let text: String; let demo: AnyView; var since = "1.0" }
@@ -121,6 +121,11 @@ struct WelcomeView: View {
 struct Release { let version: String; let date: String; let items: [String] }
 
 var RELEASES: [Release] {[
+    Release(version: "1.4", date: "27.11.2026", items: [
+        L("Sprawdź aktualizacje z palca: w ustawieniach pod zębatką albo w menu w pasku"),
+        L("Samoczynne sprawdzanie przy starcie oraz o 10:37 i 21:37"),
+        L("Nad przyciskami paska zwykła strzałka zamiast rączki"),
+    ]),
     Release(version: "1.3", date: "27.11.2026", items: [
         L("Kartka „Na dziś”: wszystko z terminem na dziś, po klientach i projektach; wraca rano na początek stosu"),
         L("Rozmiar stosu: duży, średni albo mały, i małe karteczki (tytuł, data, licznik)"),

@@ -532,7 +532,8 @@ struct ToolbarMouse: NSViewRepresentable {
             else if k >= 4 && cfg.expanded && cfg.filtering { cfg.onClear() }
         }
 
-        override func resetCursorRects() { addCursorRect(bounds, cursor: .openHand) }
+        // nad ikonkami zwykła strzałka; zaciśnięta rączka dopiero w trakcie przenoszenia stosu (mouseDragged)
+        override func resetCursorRects() { addCursorRect(bounds, cursor: .arrow) }
     }
 
     func makeNSView(context: Context) -> V { let v = V(); v.cfg = self; return v }
@@ -786,6 +787,7 @@ struct SettingsView: View {
     @State private var mini = StackLayout.mini
     @State private var lang = Lang.setting
     @State private var corner = AppDelegate.shared?.hotCorner ?? 0
+    @ObservedObject private var updater = Updater.shared
     @State private var hasKey = ClaudeKey.isOwn
     @State private var keyNote: String?
     @State private var password = ""
@@ -846,6 +848,34 @@ struct SettingsView: View {
                 .onChange(of: lang) { _, v in
                     Lang.setting = v
                     DispatchQueue.main.async { AppDelegate.shared?.relocalize() }
+                }
+            }
+            row(LF("Wersja %@", APP_VERSION)) {
+                HStack(spacing: 8) {
+                    switch updater.status {
+                    case .checking:
+                        ProgressView().controlSize(.small)
+                        Text(L("Sprawdzam…")).font(.system(size: 12)).foregroundStyle(.secondary)
+                    case .downloading(let v):
+                        ProgressView().controlSize(.small)
+                        Text(LF("Pobieram %@…", v)).font(.system(size: 12)).foregroundStyle(.secondary)
+                    case .ready(let v):
+                        smallPill(LF("Zainstaluj %@ i uruchom ponownie", v)) { Updater.shared.install(relaunch: true) }
+                    case .upToDate:
+                        Label(L("Masz najnowszą wersję"), systemImage: "checkmark.circle.fill")
+                            .font(.system(size: 12, weight: .medium)).foregroundStyle(.green)
+                        Spacer()
+                        smallPill(L("Sprawdź znowu")) { Updater.shared.checkNow() }
+                    case .failed:
+                        Text(L("Nie udało się sprawdzić.")).font(.system(size: 12)).foregroundStyle(.red)
+                        Spacer()
+                        smallPill(L("Spróbuj znowu")) { Updater.shared.checkNow() }
+                    case .unsigned:
+                        Text(L("Ta kopia jest zbudowana na miejscu i nie aktualizuje się sama.")).font(.system(size: 11))
+                            .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    case .idle:
+                        smallPill(L("Sprawdź aktualizacje")) { Updater.shared.checkNow() }
+                    }
                 }
             }
             Toggle(L("Otwieraj przy logowaniu"), isOn: $login)
