@@ -24,6 +24,8 @@ struct EditorView: View {
     @State private var smart: SmartProposal?
     @State private var smartPick: Set<Int> = []
     @State private var smartError: String?
+    @State private var sendTask: UUID?          // zadanie, dla którego otwarta jest lista karteczek
+    @State private var sendCopy = false         // true: kopiuj, false: przenieś
     private let rowGap: CGFloat = 8     // odstęp między wierszami zadań
 
     var body: some View {
@@ -169,6 +171,20 @@ struct EditorView: View {
                                         insertTask(after: t.id)
                                     }
                                 }
+                            Menu {
+                                sendMenu(t.id)
+                            } label: {
+                                Image(systemName: "arrowshape.turn.up.right").font(.system(size: 10, weight: .semibold)).foregroundStyle(fg.opacity(0.5))
+                                    .frame(width: 18, height: 18).contentShape(Rectangle())
+                            }
+                            .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+                            .padding(.top, 4)
+                            .help(L("Przenieś albo kopiuj na inną karteczkę"))
+                            .opacity(hoverTask == t.id || sendTask == t.id ? 1 : 0)
+                            .popover(isPresented: Binding(get: { sendTask == t.id }, set: { if !$0 { sendTask = nil } }), arrowEdge: .trailing) {
+                                NotePicker(exclude: id, copy: sendCopy) { target in send(t.id, to: target, copy: sendCopy); sendTask = nil }
+                                    .environmentObject(store)
+                            }
                             Button { removeTask(t.id) } label: {
                                 Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(fg.opacity(0.5))
                                     .frame(width: 18, height: 18).contentShape(Rectangle())
@@ -194,6 +210,11 @@ struct EditorView: View {
                         // wiersz w ręce idzie za myszą bez animacji, reszta rozstępuje się sprężyście
                         .transaction { if dragging && !$0[LiftKey.self] { $0.animation = nil } }
                         .onHover { h in hoverTask = h ? t.id : (hoverTask == t.id ? nil : hoverTask) }
+                        .contextMenu {
+                            sendMenu(t.id)
+                            Divider()
+                            Button(L("Usuń zadanie"), role: .destructive) { removeTask(t.id) }
+                        }
                     }
                         } footer: {
             HStack(spacing: 16) {
@@ -492,6 +513,23 @@ struct EditorView: View {
 
     private func removeTask(_ tid: UUID) {
         store.binding(id).wrappedValue.tasks.removeAll { $0.id == tid }
+    }
+
+    @ViewBuilder private func sendMenu(_ tid: UUID) -> some View {
+        Button(L("Przenieś na inną karteczkę…")) { sendCopy = false; sendTask = tid }
+        Button(L("Kopiuj na inną karteczkę…")) { sendCopy = true; sendTask = tid }
+    }
+
+    /// Przenieś: zadanie znika stąd i ląduje na końcu tamtej karteczki. Kopiuj: zostaje w obu miejscach.
+    private func send(_ tid: UUID, to target: UUID, copy: Bool) {
+        let note = store.binding(id)
+        guard target != id, let task = note.wrappedValue.tasks.first(where: { $0.id == tid }),
+              let i = store.notes.firstIndex(where: { $0.id == target }) else { return }
+        var t = task
+        if copy { t.id = UUID() }
+        store.notes[i].tasks.append(t)
+        if !copy { note.wrappedValue.tasks.removeAll { $0.id == tid } }
+        NSSound(named: "Pop")?.play()
     }
 }
 
@@ -1004,3 +1042,94 @@ struct DatePill: View {
 
 
 
+
+
+/// Lista karteczek do przeniesienia albo skopiowania zadania: wyszukiwarka i grupy według klienta.
+struct NotePicker: View {
+    var exclude: UUID
+    var copy: Bool
+    var pick: (UUID) -> Void
+    @EnvironmentObject var store: Store
+    @State private var query = ""
+    @FocusState private var focused: Bool
+
+    private func name(_ n: Note) -> String { n.title.isEmpty ? L("Bez tytułu") : n.title }
+
+    private var groups: [(client: String, notes: [Note])] {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        let list = store.active.filter { n in
+            n.id != exclude && (q.isEmpty || [n.title, n.client, n.project].contains {
+                $0.range(of: q, options: [.caseInsensitive, .diacriticInsensitive]) != nil })
+        }
+        let byClient = Dictionary(grouping: list, by: \.client)
+        return byClient.keys.sorted { a, b in
+            if a.isEmpty != b.isEmpty { return b.isEmpty }   // „Bez klienta” na końcu
+            return a.localizedCaseInsensitiveCompare(b) == .orderedAscending
+        }.map { ($0, byClient[$0]!.sorted { name($0).localizedCaseInsensitiveCompare(name($1)) == .orderedAscending }) }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(copy ? L("Kopiuj zadanie do…") : L("Przenieś zadanie do…"))
+                .font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass").font(.system(size: 11)).foregroundStyle(.secondary)
+                TextField(L("Szukaj karteczki"), text: $query).textFieldStyle(.plain).font(.system(size: 13))
+                    .focused($focused)
+                    .onSubmit { if let first = groups.first?.notes.first { pick(first.id) } }
+            }
+            .padding(.horizontal, 10).frame(height: 26)
+            .background(Capsule().fill(Color.primary.opacity(0.07)))
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    if groups.isEmpty {
+                        Text(L("Nie ma takiej karteczki.")).font(.system(size: 12)).foregroundStyle(.secondary).padding(.vertical, 8)
+                    }
+                    ForEach(groups, id: \.client) { g in
+                        HStack(spacing: 5) {
+                            if !g.client.isEmpty { Circle().fill(store.clientColor(g.client)).frame(width: 7, height: 7) }
+                            Text((g.client.isEmpty ? L("Bez klienta") : g.client).uppercased())
+                                .font(.system(size: 9.5, weight: .bold)).tracking(0.6).foregroundStyle(.secondary)
+                        }
+                        .padding(.top, 8).padding(.bottom, 2)
+                        ForEach(g.notes) { n in
+                            Button { pick(n.id) } label: {
+                                HStack(spacing: 8) {
+                                    RoundedRectangle(cornerRadius: 3).fill(palette(n.color).bg)
+                                        .overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(.black.opacity(0.15)))
+                                        .frame(width: 12, height: 14)
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(name(n)).font(.system(size: 13, weight: .medium)).lineLimit(1)
+                                        if !n.project.isEmpty {
+                                            Text(n.project).font(.system(size: 10.5)).foregroundStyle(.secondary).lineLimit(1)
+                                        }
+                                    }
+                                    Spacer(minLength: 6)
+                                    if !n.tasks.isEmpty {
+                                        Text("\(n.tasks.count)").font(.system(size: 10.5, weight: .semibold).monospacedDigit()).foregroundStyle(.secondary)
+                                    }
+                                }
+                                .padding(.horizontal, 8).padding(.vertical, 5)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(PickerRowStyle())
+                        }
+                    }
+                }
+            }
+            .frame(height: 300)
+        }
+        .padding(12)
+        .frame(width: 290)
+        .onAppear { focused = true }
+    }
+}
+
+private struct PickerRowStyle: ButtonStyle {
+    @State private var hover = false
+    func makeBody(configuration c: Configuration) -> some View {
+        c.label
+            .background(RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(c.isPressed ? 0.12 : hover ? 0.07 : 0)))
+            .onHover { hover = $0 }
+    }
+}

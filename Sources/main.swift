@@ -891,7 +891,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                 UserDefaults.standard.removeObject(forKey: "todayPos"); UserDefaults.standard.removeObject(forKey: "todayPosDay")
             }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 13.6) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 13.2) {
+            // lista karteczek do przeniesienia zadania
+            let w = NSWindow(contentRect: NSRect(x: 300, y: 100, width: 290, height: 380), styleMask: [.borderless], backing: .buffered, defer: false)
+            w.backgroundColor = NSColor(white: 0.97, alpha: 1); w.appearance = NSAppearance(named: .aqua)
+            w.contentView = NSHostingView(rootView: NotePicker(exclude: UUID(), copy: false) { _ in }.environmentObject(self.store))
+            w.orderFront(nil)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { shot(w, "21_przenies"); w.orderOut(nil) }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 14.4) {
             NSApp.terminate(nil)
         }
     }
