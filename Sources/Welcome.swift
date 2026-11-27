@@ -5,7 +5,7 @@ import UserNotifications
 
 // MARK: - Okienko powitalne: strony z animacjami możliwości i historia zmian
 
-let APP_VERSION = "1.0"
+let APP_VERSION = "1.1"
 
 struct WelcomePage { let title: String; let text: String; let demo: AnyView }
 
@@ -25,6 +25,7 @@ struct WelcomeView: View {
             WelcomePage(title: L("Terminy i przypomnienia"), text: L("Data w rogu, pilność w kolorach. Dzwoneczek ustawia przypomnienia, a karteczka podskakuje, gdy termin jest blisko."), demo: AnyView(DemoReminder())),
             WelcomePage(title: L("Klienci, projekty i tagi"), text: L("Każda karteczka może mieć klienta, projekt i tagi. Kliknij jeden z nich, żeby zostawić w stosie tylko to, co do niego pasuje."), demo: AnyView(DemoFilter())),
             WelcomePage(title: L("Kalendarz i podsumowanie"), text: L("Szara karta na końcu stosu to kalendarz. Kółka dni pokazują, co się działo, a wykres, ile zostało."), demo: AnyView(DemoCalendar())),
+            WelcomePage(title: L("Pliki przy karteczce"), text: L("Przeciągnij PDF, zdjęcie albo inny plik na otwartą karteczkę. Stosik trzyma kopię, więc nic nie zginie."), demo: AnyView(DemoFiles())),
             WelcomePage(title: L("Kosz na 30 dni"), text: L("Pociągnij karteczkę w dół, aż kosz zrobi się czerwony. Przez 30 dni możesz ją przywrócić."), demo: AnyView(DemoTrash())),
             WelcomePage(title: L("Dyktowanie"), text: L("Kliknij mikrofon i powiedz, co jest do zrobienia. Każdy czasownik zaczyna nowe zadanie, a „klient”, „projekt” i „tag” wypełniają pola."), demo: AnyView(DemoDictation())),
         ]
@@ -102,6 +103,13 @@ struct WelcomeView: View {
 struct Release { let version: String; let date: String; let items: [String] }
 
 var RELEASES: [Release] {[
+    Release(version: "1.1", date: "27.11.2026", items: [
+        L("Pliki przy karteczce: przeciągnij PDF, zdjęcie albo inny plik, Stosik trzyma kopię"),
+        L("Data i godzina terminu jako pigułki z kalendarzem"),
+        L("Przycisk OK na dole karteczki (albo Cmd+Enter)"),
+        L("Menu w pasku podzielone na sekcje, z ikonkami"),
+        L("Pasek pod pierwszą karteczką, mniejszy krzyżyk, powitanie z prawdziwymi karteczkami"),
+    ]),
     Release(version: "1.0", date: "27.11.2026", items: [
         L("Stos karteczek na pulpicie jak talia kart: rozkłada się po najechaniu, na mniejszym ekranie w rzędach"),
         L("Projekty z zadaniami, klient, projekt i tagi w kolorach, pilność, szukanie i filtr"),
@@ -168,32 +176,57 @@ func ease(_ t: Double, _ a: Double, _ b: Double) -> Double {
     let x = min(max((t - a) / (b - a), 0), 1); return x * x * (3 - 2 * x)
 }
 
-struct MiniCard: View {
-    var color: Color
-    var title = ""
-    var lines = 3
-    var done = 0
-    var w: CGFloat = 92, h: CGFloat = 116
+/// Prawdziwa karteczka ze stosu, pomniejszona (żeby pokaz wyglądał jak apka).
+struct DemoCard: View {
+    var note: Note
+    var scale: CGFloat
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack { Spacer(); Text("27").font(.system(size: 15, weight: .regular)).foregroundStyle(Color.ink.opacity(0.6)) }
-            if !title.isEmpty { Text(title).font(.system(size: 9.5, weight: .bold)).foregroundStyle(Color.ink).lineLimit(1) }
-            ForEach(0..<lines, id: \.self) { i in
-                HStack(spacing: 4) {
-                    Circle().strokeBorder(Color.ink.opacity(0.6), lineWidth: 1).background(Circle().fill(i < done ? Color.ink : .clear))
-                        .frame(width: 7, height: 7)
-                    RoundedRectangle(cornerRadius: 1.5).fill(Color.ink.opacity(i < done ? 0.18 : 0.35)).frame(height: 3)
+        CardView(note: .constant(note))
+            .scaleEffect(scale, anchor: .topLeading)
+            .frame(width: StackLayout.cardW * scale, height: StackLayout.cardH * scale, alignment: .topLeading)
+            .allowsHitTesting(false)
+    }
+}
+
+/// Karteczka do pokazu: kolor, tytuł, zadania (ile odhaczonych), klient, projekt, tag, pilność, termin za ile dni.
+func demoNote(_ color: Int, _ title: String, _ tasks: [String], done: Int = 0, client: String = "", project: String = "",
+              tags: [String] = [], priority: Int = 0, due: Int? = nil, alerts: [Int] = []) -> Note {
+    var n = Note()
+    n.color = color; n.title = title; n.client = client; n.project = project; n.tags = tags; n.priority = priority
+    n.tasks = tasks.enumerated().map { TaskItem(text: $0.element, done: $0.offset < done) }
+    if let due { n.deadline = Calendar.current.date(byAdding: .day, value: due, to: Calendar.current.startOfDay(for: Date())) }
+    n.alerts = alerts
+    return n
+}
+
+/// Szara karta kalendarza na końcu stosu (w małej wersji).
+struct MiniCalendarCard: View {
+    var w: CGFloat, h: CGFloat
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(monthName(Calendar.current.component(.month, from: Date())))
+                .font(.system(size: w * 0.085, weight: .semibold)).foregroundStyle(Color.ink)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 7), spacing: 3) {
+                ForEach(0..<28, id: \.self) { i in
+                    Circle().fill(i == 19 ? PriorityIcon.purple : Color.ink.opacity(0.1)).frame(width: w * 0.055, height: w * 0.055)
                 }
             }
             Spacer(minLength: 0)
         }
-        .padding(8)
+        .padding(w * 0.08)
         .frame(width: w, height: h, alignment: .topLeading)
-        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(color).shadow(color: .black.opacity(0.25), radius: 5, y: 3))
+        .background(RoundedRectangle(cornerRadius: w * 0.07, style: .continuous).fill(CAL_GREY))
     }
 }
 
-private let DEMO_COLORS = [palette(2).bg, palette(1).bg, palette(3).bg, palette(6).bg, CAL_GREY]
+private let DEMO_NOTES: [Note] = [
+    demoNote(2, L("Prezentacja dla klienta"), [L("Poprawić slajdy"), L("Dorobić obrazki"), L("Wysłać do klienta")], done: 1,
+             client: "Studio Nova", project: "Branding", tags: ["design"], priority: 3, due: 1, alerts: [1440]),
+    demoNote(1, L("Pomysły na weekend"), [L("Rower"), L("Kino")], tags: [L("pomysły")], priority: 1),
+    demoNote(3, L("Zakupy"), [L("Chleb"), L("Kawa"), L("Baterie AA")], done: 1, tags: [L("dom")]),
+    demoNote(6, L("Klient: kawiarnia"), [L("Pierwszy krok")], client: L("Kawiarnia Róża"), project: L("Menu")),
+]
+
 
 struct DemoStack: View {
     var body: some View {
@@ -204,7 +237,10 @@ struct DemoStack: View {
                     let tight = -40 + CGFloat(i) * 12, wide = (CGFloat(i) - 2) * 100
                     let x = tight + (wide - tight) * s
                     let ang = (i % 2 == 0 ? -3.2 : 3.6) * (1 - s)
-                    MiniCard(color: DEMO_COLORS[i], lines: 3, done: i == 0 ? 1 : 0)
+                    Group {
+                        if i < 4 { DemoCard(note: DEMO_NOTES[i], scale: 0.44) } else { MiniCalendarCard(w: 92, h: 115) }
+                    }
+                    .shadow(color: .black.opacity(0.25), radius: 5, y: 3)
                         .rotationEffect(.degrees(ang))
                         .offset(x: x, y: -CGFloat(i) * 2 * (1 - s))
                 }
@@ -220,33 +256,10 @@ struct DemoTasks: View {
     var body: some View {
         Loop(period: 4.5) { t in
             let done = Int(ease(t, 0.15, 0.75) * 3.99)
-            HStack(spacing: 28) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Studio Nova").font(.system(size: 11, weight: .bold)).tracking(0.6).foregroundStyle(Color.ink.opacity(0.55))
-                    Text(L("Prezentacja")).font(.system(size: 18, weight: .semibold)).foregroundStyle(Color.ink)
-                    ForEach(0..<3, id: \.self) { i in
-                        HStack(spacing: 8) {
-                            CheckCircle(done: i < done, color: .ink, size: 15)
-                            Text([L("Poprawić slajdy"), L("Dorobić obrazki"), L("Wysłać do klienta")][i])
-                                .font(.system(size: 12.5)).strikethrough(i < done).foregroundStyle(Color.ink.opacity(i < done ? 0.45 : 0.9))
-                        }
-                        .animation(.spring(response: 0.3), value: done)
-                    }
-                    HStack(spacing: 6) {
-                        GeometryReader { g in
-                            ZStack(alignment: .leading) {
-                                Capsule().fill(Color.ink.opacity(0.14))
-                                Capsule().fill(Color.ink.opacity(0.8)).frame(width: g.size.width * CGFloat(done) / 3)
-                            }
-                        }.frame(height: 3)
-                        Text("\(done)/3").font(.system(size: 10, weight: .semibold)).foregroundStyle(Color.ink.opacity(0.7))
-                    }
-                    .animation(.spring(response: 0.4), value: done)
-                }
-                .padding(16)
-                .frame(width: 230, height: 200, alignment: .topLeading)
-                .background(RoundedRectangle(cornerRadius: 14).fill(palette(4).bg).shadow(color: .black.opacity(0.3), radius: 10, y: 5))
-            }
+            DemoCard(note: demoNote(4, L("Prezentacja"), [L("Poprawić slajdy"), L("Dorobić obrazki"), L("Wysłać do klienta")],
+                                    done: done, client: "Studio Nova", project: "Branding", priority: 2), scale: 0.88)
+                .shadow(color: .black.opacity(0.3), radius: 10, y: 5)
+                .animation(.spring(response: 0.3), value: done)
         }
     }
 }
@@ -257,22 +270,10 @@ struct DemoReminder: View {
             let hop = t < 0.3 ? -sin(t / 0.3 * .pi * 2).magnitude * 22 * (1 - t / 0.3) : 0
             let banner = ease(t, 0.35, 0.45) - ease(t, 0.85, 0.95)
             ZStack {
-                HStack(alignment: .top, spacing: 10) {
-                    PriorityIcon(level: 3).frame(width: 26, height: 26)
-                    Image(systemName: "bell.fill").font(.system(size: 12)).foregroundStyle(Color.ink.opacity(0.7))
-                        .rotationEffect(.degrees(t < 0.3 ? sin(t * 60) * 18 : 0), anchor: .top)
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 0) {
-                        Text("28").font(.system(size: 30))
-                        Text(L("jutro")).font(.system(size: 9, weight: .bold)).foregroundStyle(.white)
-                            .padding(.horizontal, 6).padding(.vertical, 2).background(Capsule().fill(Color.ink))
-                    }
-                }
-                .foregroundStyle(Color.ink)
-                .padding(14)
-                .frame(width: 170, height: 150, alignment: .topLeading)
-                .background(RoundedRectangle(cornerRadius: 12).fill(palette(2).bg).shadow(color: .black.opacity(0.3), radius: 8, y: 4))
-                .offset(x: -70, y: 20 + hop)
+                DemoCard(note: demoNote(2, L("Prezentacja dla klienta"), [L("Poprawić slajdy"), L("Dorobić obrazki"), L("Wysłać do klienta")],
+                                        done: 1, client: "Studio Nova", project: "Branding", priority: 3, due: 1, alerts: [1440]), scale: 0.72)
+                .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+                .offset(x: -80, y: 8 + hop)
 
                 HStack(spacing: 8) {
                     RoundedRectangle(cornerRadius: 5).fill(palette(2).bg).frame(width: 22, height: 22)
@@ -310,15 +311,9 @@ struct DemoFilter: View {
                 HStack(spacing: 12) {
                     ForEach(0..<4, id: \.self) { i in
                         let match = i == 0 || i == 2
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(spacing: 3) {
-                                Circle().fill(match ? palette(5).bg : palette(7).bg).frame(width: 5, height: 5)
-                                Text(match ? "STUDIO NOVA" : "KAWIARNIA").font(.system(size: 6.5, weight: .bold)).foregroundStyle(Color.ink.opacity(0.6))
-                            }
-                            MiniCard(color: DEMO_COLORS[i], lines: 2, w: 76, h: 80).shadow(radius: 0)
-                        }
-                        .padding(6)
-                        .background(RoundedRectangle(cornerRadius: 10).fill(DEMO_COLORS[i]))
+                        DemoCard(note: demoNote([2, 1, 4, 6][i], [L("Prezentacja"), L("Ulotka"), L("Logo"), L("Menu")][i],
+                                                [L("Pierwszy krok"), L("Drugi krok")], done: i == 0 ? 1 : 0,
+                                                client: match ? "Studio Nova" : L("Kawiarnia")), scale: 0.4)
                         .opacity(match ? 1 : 1 - on * 0.85)
                         .scaleEffect(match ? 1 : 1 - on * 0.08)
                     }
@@ -366,6 +361,42 @@ struct DemoCalendar: View {
     }
 }
 
+struct DemoFiles: View {
+    var body: some View {
+        Loop(period: 4.4) { t in
+            let fly1 = ease(t, 0.1, 0.35), fly2 = ease(t, 0.42, 0.67)
+            let out = ease(t, 0.9, 1.0)
+            let n = (fly1 > 0.98 ? 1 : 0) + (fly2 > 0.98 ? 1 : 0)
+            let note = withFiles(demoNote(5, L("Prezentacja"), [L("Poprawić slajdy"), L("Wysłać do klienta")], client: "Studio Nova"), n)
+            ZStack {
+                DemoCard(note: note, scale: 0.72)
+                    .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+                    .offset(x: -60)
+                fileIcon("doc.richtext.fill", "PDF")
+                    .offset(x: 150 - 210 * fly1, y: -40 + 40 * fly1)
+                    .scaleEffect(1 - 0.5 * fly1).opacity(1 - ease(t, 0.3, 0.36))
+                fileIcon("photo.fill", "JPG")
+                    .offset(x: 150 - 210 * fly2, y: 40 - 30 * fly2)
+                    .scaleEffect(1 - 0.5 * fly2).opacity(fly1 > 0.5 ? 1 - ease(t, 0.62, 0.68) : 0)
+                Image(systemName: "cursorarrow").font(.system(size: 18)).foregroundStyle(.white).shadow(radius: 2)
+                    .offset(x: 165 - 210 * (fly1 < 1 ? fly1 : fly2), y: (fly1 < 1 ? -25 + 40 * fly1 : 55 - 30 * fly2))
+            }
+            .opacity(1 - out)
+        }
+    }
+
+    private func withFiles(_ n: Note, _ count: Int) -> Note {
+        var n = n; n.files = (0..<count).map { _ in Attachment(name: "plik") }; return n
+    }
+
+    private func fileIcon(_ sym: String, _ label: String) -> some View {
+        VStack(spacing: 3) {
+            Image(systemName: sym).font(.system(size: 30)).foregroundStyle(.white.opacity(0.9))
+            Text(label).font(.system(size: 9, weight: .bold)).tracking(0.6).foregroundStyle(.white.opacity(0.6))
+        }
+    }
+}
+
 struct DemoTrash: View {
     var body: some View {
         Loop(period: 4.6) { t in
@@ -384,13 +415,13 @@ struct DemoTrash: View {
                 ForEach(0..<4, id: \.self) { i in
                     let base = (CGFloat(i) - 1.5) * dx - (i > pick ? dx * close : 0)
                     if i == pick {
-                        MiniCard(color: DEMO_COLORS[i], lines: 3, w: 80, h: 100)
+                        DemoCard(note: DEMO_NOTES[i], scale: 0.38)
                             .scaleEffect(1.04 - 0.45 * down, anchor: .bottom)
                             .offset(x: base, y: -30 - 8 * grab + 96 * down)
                             .opacity(1 - gone)
                             .zIndex(1)
                     } else {
-                        MiniCard(color: DEMO_COLORS[i], lines: 3, w: 80, h: 100)
+                        DemoCard(note: DEMO_NOTES[i], scale: 0.38)
                             .rotationEffect(.degrees(sin(Double(i) * 1.15) * 2))
                             .offset(x: base, y: -30 + CGFloat(sin(Double(i) * 1.15 + 0.9)) * 5)
                     }
@@ -439,16 +470,8 @@ struct DemoDictation: View {
                 .opacity(1 - card)
                 .scaleEffect(1 - 0.1 * card)
 
-                VStack(alignment: .leading, spacing: 7) {
-                    Text("Studio Nova").font(.system(size: 16, weight: .semibold))
-                    ForEach([L("Poprawić slajdy"), L("Dorobić obrazki"), L("Wysłać do klienta")], id: \.self) { s in
-                        HStack(spacing: 6) { CheckCircle(done: false, color: .ink, size: 12); Text(s).font(.system(size: 11.5)) }
-                    }
-                }
-                .foregroundStyle(Color.ink)
-                .padding(14)
-                .frame(width: 200, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 12).fill(palette(1).bg).shadow(color: .black.opacity(0.3), radius: 8, y: 4))
+                DemoCard(note: demoNote(1, "Studio Nova", [L("Poprawić slajdy"), L("Dorobić obrazki"), L("Wysłać do klienta")]), scale: 0.8)
+                .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
                 .opacity(card)
                 .scaleEffect(0.85 + 0.15 * card)
             }

@@ -24,6 +24,7 @@ cat > "$A/Contents/Resources/en.lproj/InfoPlist.strings" <<'S'
 "NSMicrophoneUsageDescription" = "Stackie only listens while you dictate tasks.";
 "NSSpeechRecognitionUsageDescription" = "Stackie turns your dictated tasks into text.";
 S
+VER=$(sed -n 's/^let APP_VERSION = "\(.*\)"/\1/p' Sources/Welcome.swift)
 cat > "$A/Contents/Info.plist" <<P
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -34,8 +35,8 @@ cat > "$A/Contents/Info.plist" <<P
 <key>CFBundleExecutable</key><string>Stosik</string>
 <key>CFBundleIconFile</key><string>ikona</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>1.0</string>
-<key>CFBundleVersion</key><string>1</string>
+<key>CFBundleShortVersionString</key><string>$VER</string>
+<key>CFBundleVersion</key><string>$VER</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>LSUIElement</key><true/>
 <key>CFBundleDevelopmentRegion</key><string>pl</string>

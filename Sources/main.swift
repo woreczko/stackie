@@ -411,29 +411,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
-        menu.addItem(item(L("Nowa karteczka"), #selector(menuNew), "n"))
-        menu.addItem(item(stack.isVisible ? L("Schowaj stos") : L("Pokaż stos"), #selector(menuToggle), ""))
-        menu.addItem(item(L("Kalendarz i podsumowanie"), #selector(menuCalendar), "k"))
+        // Stos
+        menu.addItem(item(L("Nowa karteczka"), #selector(menuNew), "n", "plus"))
+        menu.addItem(item(L("Kalendarz i podsumowanie"), #selector(menuCalendar), "k", "calendar"))
+        menu.addItem(item(stack.isVisible ? L("Schowaj stos") : L("Pokaż stos"), #selector(menuToggle), "",
+                          stack.isVisible ? "eye.slash" : "eye"))
+
+        // Terminy
         let due = store.active.filter { (dueInfo($0)?.level ?? -1) >= 1 }
         if !due.isEmpty {
             menu.addItem(.separator())
-            let h = NSMenuItem(title: L("Zbliża się termin"), action: nil, keyEquivalent: ""); h.isEnabled = false
-            menu.addItem(h)
+            menu.addItem(.sectionHeader(title: L("Zbliża się termin")))
             for n in due {
-                let it = item("\(n.title.isEmpty ? L("Bez tytułu") : n.title) · \(dueInfo(n)!.text)", #selector(menuOpen(_:)), "")
+                let it = item("\(n.title.isEmpty ? L("Bez tytułu") : n.title) · \(dueInfo(n)!.text)", #selector(menuOpen(_:)), "", "clock")
                 it.representedObject = n.id
                 menu.addItem(it)
             }
         }
+
+        // Karteczki
         menu.addItem(.separator())
-        let pos = NSMenuItem(title: L("Położenie stosu"), action: nil, keyEquivalent: "")
-        let sub = NSMenu()
-        for (i, t) in [L("Na pulpicie (pod oknami)"), L("Zwykłe okno"), L("Zawsze na wierzchu")].enumerated() {
-            let it = item(t, #selector(menuLevel(_:)), ""); it.tag = i; it.state = levelMode == i ? .on : .off
-            sub.addItem(it)
-        }
-        pos.submenu = sub; menu.addItem(pos)
-        let tagsItem = NSMenuItem(title: L("Pokaż tag"), action: nil, keyEquivalent: "")
+        menu.addItem(.sectionHeader(title: L("Karteczki")))
+        let tagsItem = item(L("Pokaż tag"), nil, "", "number")
         let tsub = NSMenu()
         let all = item(L("Wszystkie karteczki"), #selector(menuTag(_:)), ""); all.state = ui.filterTag == nil ? .on : .off
         tsub.addItem(all)
@@ -444,7 +443,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             tsub.addItem(it)
         }
         tagsItem.submenu = tsub; menu.addItem(tagsItem)
-        let arch = NSMenuItem(title: LF("Archiwum (%d)", store.archived.count), action: nil, keyEquivalent: "")
+        let arch = item(LF("Archiwum (%d)", store.archived.count), nil, "", "archivebox")
         let asub = NSMenu()
         if store.archived.isEmpty {
             let e = NSMenuItem(title: L("Pusto"), action: nil, keyEquivalent: ""); e.isEnabled = false; asub.addItem(e)
@@ -455,7 +454,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             asub.addItem(it)
         }
         arch.submenu = asub; menu.addItem(arch)
-        let langItem = NSMenuItem(title: Lang.current == "pl" ? "Język · Language" : "Language · Język", action: nil, keyEquivalent: "")
+        menu.addItem(item(LF("Kosz (%d)", store.trash.count), #selector(menuTrash), "", "trash"))
+
+        // Ustawienia
+        menu.addItem(.separator())
+        menu.addItem(.sectionHeader(title: L("Ustawienia")))
+        let pos = item(L("Położenie stosu"), nil, "", "square.stack")
+        let sub = NSMenu()
+        for (i, t) in [L("Na pulpicie (pod oknami)"), L("Zwykłe okno"), L("Zawsze na wierzchu")].enumerated() {
+            let it = item(t, #selector(menuLevel(_:)), ""); it.tag = i; it.state = levelMode == i ? .on : .off
+            sub.addItem(it)
+        }
+        pos.submenu = sub; menu.addItem(pos)
+        let langItem = item(Lang.current == "pl" ? "Język · Language" : "Language · Język", nil, "", "globe")
         let lsub = NSMenu()
         for (code, title) in [("auto", L("Automatycznie (system)")), ("pl", "Polski"), ("en", "English")] {
             let it = item(title, #selector(menuLang(_:)), ""); it.representedObject = code
@@ -463,17 +474,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             lsub.addItem(it)
         }
         langItem.submenu = lsub; menu.addItem(langItem)
-        menu.addItem(item(LF("Kosz (%d)", store.trash.count), #selector(menuTrash), ""))
-        menu.addItem(item(L("Witaj i co nowego"), #selector(menuWelcome), ""))
-        let login = item(L("Otwieraj przy logowaniu"), #selector(menuLogin), "")
+        let login = item(L("Otwieraj przy logowaniu"), #selector(menuLogin), "", "power")
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
         menu.addItem(login)
+
+        // Na koniec
         menu.addItem(.separator())
+        menu.addItem(item(L("Witaj i co nowego"), #selector(menuWelcome), "", "sparkles"))
         menu.addItem(item(L("Zakończ Stosik"), #selector(menuQuit), "q"))
     }
 
-    private func item(_ t: String, _ s: Selector, _ k: String) -> NSMenuItem {
-        let i = NSMenuItem(title: t, action: s, keyEquivalent: k); i.target = self; return i
+    private func item(_ t: String, _ s: Selector?, _ k: String, _ icon: String? = nil) -> NSMenuItem {
+        let i = NSMenuItem(title: t, action: s, keyEquivalent: k); i.target = self
+        if let icon { i.image = NSImage(systemSymbolName: icon, accessibilityDescription: nil) }
+        return i
     }
 
     @objc func menuNew() { stack.orderFrontRegardless(); newNote() }
@@ -631,7 +645,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             if let w = self.trashWin { shot(w, "11_kosz") }
             self.trashWin?.orderOut(nil)
         }
-        for (k, pg) in [(8.0, 0), (8.4, 1), (8.8, 2), (9.2, 4), (9.6, 5), (10.0, 6), (10.4, 7), (10.8, 8)] {
+        for (k, pg) in [(8.0, 0), (8.4, 1), (8.8, 2), (9.0, 3), (9.2, 4), (9.4, 5), (9.6, 6), (10.0, 7), (10.4, 8), (10.8, 9)] {
             DispatchQueue.main.asyncAfter(deadline: .now() + k) {
                 let w = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 560, height: 470), styleMask: [.borderless], backing: .buffered, defer: false)
                 w.appearance = NSAppearance(named: .aqua)
@@ -640,7 +654,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { shot(w, "14_witaj_\(pg)"); w.orderOut(nil) }
             }
         }
-        for k in [(11.0, (5, 0.02)), (11.3, (5, 0.45)), (11.6, (5, 0.6)), (11.9, (5, 0.8)), (12.2, (5, 0.97))].enumerated() {
+        for k in [(11.0, (5, 0.25)), (11.3, (5, 0.5)), (11.6, (5, 0.75)), (11.9, (6, 0.45)), (12.2, (6, 0.8))].enumerated() {
             DispatchQueue.main.asyncAfter(deadline: .now() + k.element.0) {
                                 let (pg, ph) = k.element.1
                 FROZEN_PHASE = ph
@@ -651,7 +665,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { shot(w, "15_klatka_\(k.offset)"); w.orderOut(nil); FROZEN_PHASE = nil }
             }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 12.8) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 12.5) {
+            // karteczka z plikami (zdjęcie i tekst z projektu)
+            let id = self.store.add()
+            if let i = self.store.notes.firstIndex(where: { $0.id == id }) {
+                self.store.notes[i].title = L("Pomysły na weekend"); self.store.notes[i].tasks = []
+                self.store.notes[i].body = ""
+                self.store.notes[i].deadline = Calendar.current.date(bySettingHour: 14, minute: 30, second: 0, of: Date())
+                self.store.notes[i].hasTime = true
+            }
+            let here = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            self.store.attach(id, [URL(fileURLWithPath: "/System/Library/Desktop Pictures/Mac Pink.heic"),
+                                   here.appendingPathComponent("README.md")])
+            let w = NSWindow(contentRect: NSRect(x: 300, y: 100, width: 400, height: 640), styleMask: [.borderless], backing: .buffered, defer: false)
+            w.isOpaque = false; w.backgroundColor = .clear
+            w.contentView = NSHostingView(rootView: EditorView(id: id, close: {}).environmentObject(self.store))
+            w.orderFront(nil)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { shot(w, "16_pliki"); w.orderOut(nil) }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 13.3) {
             NSApp.terminate(nil)
         }
     }

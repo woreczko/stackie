@@ -1,4 +1,5 @@
 import SwiftUI
+import ImageIO
 
 /// Otwarta karteczka: tytuł, kolor, pilność, termin, zadania, notatka.
 struct EditorView: View {
@@ -13,6 +14,7 @@ struct EditorView: View {
     @State private var dragY: CGFloat = 0
     @State private var dragShift = 0
     @State private var liftTask: UUID?
+    @State private var dropping = false
     private let rowStep: CGFloat = 34   // wysokość wiersza zadania + odstęp
 
     var body: some View {
@@ -169,8 +171,26 @@ struct EditorView: View {
                         .buttonStyle(.plain).help(L("Mów, co jest do zrobienia. Każde zdanie to osobne zadanie."))
                     }
 
-                    Text(L("Notatka")).font(.system(size: 11, weight: .bold)).tracking(0.8).textCase(.uppercase)
-                        .foregroundStyle(fg.opacity(0.6)).padding(.top, 14)
+                    HStack {
+                        Text(L("Notatka")).font(.system(size: 11, weight: .bold)).tracking(0.8).textCase(.uppercase)
+                            .foregroundStyle(fg.opacity(0.6))
+                        Spacer()
+                        Button { pickFiles(id) } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: "paperclip").font(.system(size: 10, weight: .bold))
+                                Text(L("Dołącz plik")).font(.system(size: 12, weight: .medium))
+                            }
+                            .foregroundStyle(fg.opacity(0.6)).contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain).help(L("Albo przeciągnij plik na karteczkę"))
+                    }
+                    .padding(.top, 14)
+                    ZStack(alignment: .topLeading) {
+                        if note.wrappedValue.body.isEmpty {
+                            Text(L("Pisz tutaj. Możesz też upuścić plik: PDF, zdjęcie albo inny."))
+                                .font(.system(size: 13.5)).foregroundStyle(fg.opacity(0.35))
+                                .padding(.top, 0).allowsHitTesting(false)
+                        }
                     TextEditor(text: note.body)
                         .font(.system(size: 13.5))
                         .foregroundStyle(fg)
@@ -178,6 +198,8 @@ struct EditorView: View {
                         .scrollDisabled(true)
                         .frame(minHeight: 70)
                         .padding(.horizontal, -5)
+                    }
+                    FilesSection(id: id, fg: fg)
                 }
                 .padding(.trailing, 6)
             }
@@ -195,23 +217,53 @@ struct EditorView: View {
                     Label(note.wrappedValue.archived ? L("Przywróć do stosu") : L("Zrobione, do archiwum"),
                           systemImage: note.wrappedValue.archived ? "arrow.uturn.backward" : "checkmark").font(.system(size: 12, weight: .semibold))
                         .padding(.horizontal, 12).padding(.vertical, 7)
+                        .background(Capsule().fill(fg.opacity(0.1)))
+                        .contentShape(Capsule())
+                        .foregroundStyle(fg)
+                }
+                .buttonStyle(.plain)
+                Button(action: close) {
+                    Text("OK").font(.system(size: 12, weight: .semibold))
+                        .padding(.horizontal, 18).padding(.vertical, 7)
                         .background(Capsule().fill(fg))
                         .foregroundStyle(pal.dark ? Color.ink : .white)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.plain).keyboardShortcut(.return, modifiers: .command)
             }
             .padding(.top, 10)
         }
         .padding(EdgeInsets(top: 18, leading: 22, bottom: 18, trailing: 22))
         .frame(width: 400, height: 640, alignment: .topLeading)
         .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(pal.bg))
+        .overlay {
+            if dropping {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(fg.opacity(0.5), style: StrokeStyle(lineWidth: 2, dash: [7, 5]))
+                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(pal.bg.opacity(0.85)))
+                    .overlay(VStack(spacing: 8) {
+                        Image(systemName: "paperclip").font(.system(size: 26, weight: .semibold))
+                        Text(L("Upuść, żeby dołączyć")).font(.system(size: 14, weight: .semibold))
+                    }.foregroundStyle(fg.opacity(0.75)))
+                    .padding(8).allowsHitTesting(false)
+            }
+        }
+        .onDrop(of: [.fileURL], isTargeted: $dropping) { items in
+            for it in items {
+                _ = it.loadObject(ofClass: URL.self) { url, _ in
+                    guard let url else { return }
+                    DispatchQueue.main.async { store.attach(id, [url]) }
+                }
+            }
+            return true
+        }
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(.black.opacity(0.1)))
         .overlay(alignment: .topTrailing) {
             Button(action: close) {
-                Image(systemName: "xmark").font(.system(size: 10, weight: .bold)).foregroundStyle(fg.opacity(0.7))
-                    .frame(width: 22, height: 22).background(Circle().fill(fg.opacity(0.1)))
+                Image(systemName: "xmark").font(.system(size: 7, weight: .bold)).foregroundStyle(fg.opacity(0.6))
+                    .frame(width: 15, height: 15).background(Circle().fill(fg.opacity(0.1)))
+                    .padding(4).contentShape(Rectangle())
             }
-            .buttonStyle(.plain).keyboardShortcut(.cancelAction).padding(8)
+            .buttonStyle(.plain).keyboardShortcut(.cancelAction).padding(2)
         }
         .tint(fg)
         .environment(\.colorScheme, pal.dark ? .dark : .light)
@@ -286,17 +338,21 @@ struct DeadlineRow: View {
                     .toggleStyle(FlatSwitch(fg: fg))
                 Spacer()
                 if note.deadline != nil {
-                    Toggle(isOn: $note.hasTime) { Text(L("godzina")).font(.system(size: 12)) }
+                    Toggle(isOn: Binding(get: { note.hasTime }, set: { on in
+                        note.hasTime = on
+                        let cal = Calendar.current
+                        if on, let d = note.deadline, cal.component(.hour, from: d) == 0, cal.component(.minute, from: d) == 0 {
+                            note.deadline = cal.date(bySettingHour: 9, minute: 0, second: 0, of: d)
+                        }
+                    })) { Text(L("godzina")).font(.system(size: 12)) }
                         .toggleStyle(FlatCheck(fg: fg))
                 }
             }
             if note.deadline != nil {
                 HStack(spacing: 6) {
-                    DatePicker("", selection: Binding(get: { note.deadline ?? Date() }, set: { note.deadline = $0 }),
-                               displayedComponents: note.hasTime ? [.date, .hourAndMinute] : [.date])
-                        .labelsHidden()
-                        .datePickerStyle(.field)
-                        .environment(\.locale, Lang.locale)
+                    let d = Binding(get: { note.deadline ?? Date() }, set: { note.deadline = $0 })
+                    DatePill(date: d, fg: fg)
+                    if note.hasTime { DatePill(date: d, time: true, fg: fg) }
                     Spacer()
                     quick(L("Dziś"), 0); quick(L("Jutro"), 1); quick(L("+7 dni"), 7)
                 }
@@ -562,8 +618,8 @@ struct AlertsRow: View {
             }
             if custom {
                 HStack(spacing: 8) {
-                    DatePicker("", selection: $when, displayedComponents: [.date, .hourAndMinute])
-                        .labelsHidden().datePickerStyle(.field).environment(\.locale, Lang.locale)
+                    DatePill(date: $when, fg: fg)
+                    DatePill(date: $when, time: true, fg: fg)
                     Button(L("Dodaj")) {
                         if let base = note.alertBase {
                             let m = Int((base.timeIntervalSince(when) / 60).rounded())
@@ -587,3 +643,126 @@ struct AlertsRow: View {
         return "\(c.day!) \(monthShort(c.month!).lowercased()) \(timeString(d))"
     }
 }
+
+
+/// Pliki karteczki: miniatura albo ikona, nazwa; kliknięcie otwiera, krzyżyk odpina.
+struct FilesSection: View {
+    @EnvironmentObject var store: Store
+    let id: UUID
+    let fg: Color
+    @State private var hover: UUID?
+
+    var body: some View {
+        let files = store.notes.first { $0.id == id }?.files ?? []
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(files) { a in
+                let url = store.fileURL(id, a)
+                HStack(spacing: 8) {
+                    FileThumb(url: url)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(a.name).font(.system(size: 12.5, weight: .medium)).foregroundStyle(fg)
+                            .lineLimit(1).truncationMode(.middle)
+                        Text(ByteCountFormatter.string(fromByteCount: a.size, countStyle: .file))
+                            .font(.system(size: 10.5)).foregroundStyle(fg.opacity(0.5))
+                    }
+                    Spacer(minLength: 4)
+                    if hover == a.id {
+                        Button { store.detach(id, a) } label: {
+                            Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(fg.opacity(0.6))
+                                .frame(width: 18, height: 18).background(Circle().fill(fg.opacity(0.1)))
+                        }
+                        .buttonStyle(.plain).help(L("Odepnij plik"))
+                    }
+                }
+                .padding(.horizontal, 6).padding(.vertical, 4)
+                .background(RoundedRectangle(cornerRadius: 8).fill(fg.opacity(hover == a.id ? 0.1 : 0.05)))
+                .contentShape(Rectangle())
+                .onHover { hover = $0 ? a.id : (hover == a.id ? nil : hover) }
+                .onTapGesture { NSWorkspace.shared.open(url) }
+                .onDrag { NSItemProvider(contentsOf: url) ?? NSItemProvider() }
+                .contextMenu {
+                    Button(L("Otwórz")) { NSWorkspace.shared.open(url) }
+                    Button(L("Pokaż w Finderze")) { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+                    Divider()
+                    Button(L("Odepnij plik")) { store.detach(id, a) }
+                }
+                .help(a.name)
+            }
+        }
+        .padding(.top, files.isEmpty ? 0 : 8)
+    }
+}
+
+/// Okno wyboru plików do dołączenia.
+func pickFiles(_ id: UUID) {
+    let p = NSOpenPanel()
+    p.allowsMultipleSelection = true
+    p.canChooseDirectories = false
+    NSApp.activate(ignoringOtherApps: true)
+    if p.runModal() == .OK { Store.shared.attach(id, p.urls) }
+}
+
+/// Miniatura zdjęcia albo ikona pliku z Findera (mała kopia, żeby duże zdjęcia nie zjadały pamięci).
+struct FileThumb: View {
+    let url: URL
+    @State private var img: NSImage?
+    var body: some View {
+        Image(nsImage: img ?? NSWorkspace.shared.icon(forFile: url.path)).resizable().scaledToFill()
+            .frame(width: 26, height: 26)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .task(id: url) {
+                let opts: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true,
+                                             kCGImageSourceThumbnailMaxPixelSize: 96,
+                                             kCGImageSourceCreateThumbnailWithTransform: true]
+                if let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+                   CGImageSourceGetType(src) != nil, CGImageSourceGetCount(src) > 0,
+                   let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) {
+                    img = NSImage(cgImage: cg, size: .zero)
+                }
+            }
+    }
+}
+
+
+/// Data albo godzina jako pigułka w kolorze karteczki (jak „Dziś” i „Jutro”); kliknięcie otwiera wybór.
+struct DatePill: View {
+    @Binding var date: Date
+    var time = false
+    var fg: Color
+    @State private var open = false
+
+    var body: some View {
+        Button { open.toggle() } label: {
+            HStack(spacing: 5) {
+                Image(systemName: time ? "clock" : "calendar").font(.system(size: 10, weight: .bold)).opacity(0.7)
+                Text(label).font(.system(size: 11.5, weight: .semibold).monospacedDigit())
+            }
+            .foregroundStyle(fg)
+            .padding(.horizontal, 10).padding(.vertical, 4)
+            .background(Capsule().fill(fg.opacity(open ? 0.18 : 0.1)))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $open, arrowEdge: .bottom) {
+            Group {
+                if time {
+                    DatePicker("", selection: $date, displayedComponents: [.hourAndMinute])
+                        .labelsHidden().datePickerStyle(.stepperField)
+                } else {
+                    DatePicker("", selection: $date, displayedComponents: [.date])
+                        .labelsHidden().datePickerStyle(.graphical)
+                }
+            }
+            .environment(\.locale, Lang.locale)
+            .padding(12)
+        }
+    }
+
+    private var label: String {
+        if time { return timeString(date) }
+        let f = DateFormatter(); f.locale = Lang.locale
+        f.setLocalizedDateFormatFromTemplate("dMMMyyyy")
+        return f.string(from: date)
+    }
+}
+

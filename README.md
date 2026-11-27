@@ -15,6 +15,7 @@ Polska wersja nazywa się **Stosik**: opis po polsku jest niżej.
 - **Priority** in three colours, shown as a small layered icon.
 - **Deadlines and reminders** like in Calendar: several per note, preset intervals or an exact time. Notes with a close deadline hop in the stack; the bell on the note lets you snooze or mute.
 - **Calendar card** at the end of the stack: month and year views, day rings by client, project or tag, and a done-vs-left summary.
+- **Files on notes.** Drop a PDF, a photo or any file onto an open note; Stackie keeps its own copy, so moving the original doesn't break anything.
 - **30-day bin.** Drag a note down onto the bin; restore it any time within 30 days.
 - **Dictation.** Click the mic and say what needs doing: each verb starts a new task, and “client …”, “project …”, “tag …” and spoken deadlines fill in the fields (best in Polish).
 - **Polish and English**, switchable without restarting (follows the system by default).
@@ -26,7 +27,7 @@ Polska wersja nazywa się **Stosik**: opis po polsku jest niżej.
 
 ## Install
 
-1. Download **Stackie-1.0.zip** from [Releases](../../releases).
+1. Download **Stackie-1.1.zip** from [Releases](../../releases).
 2. Unzip it and move **Stosik.app** to **Applications** (on an English Mac it shows as *Stackie*).
 3. Double-click to open. The app is signed and notarized by Apple, so macOS opens it without warnings.
 4. Stackie lives in the menu bar and on your desktop (no Dock icon). A welcome window shows what it can do and asks for the permissions it needs (notifications for reminders, microphone and speech recognition for dictation).
@@ -49,9 +50,9 @@ Your notes are stored in `~/Library/Application Support/Stosik/`.
 
 ## Po polsku: Stosik
 
-**Karteczki na pulpicie Maca, ułożone w stos jak talia kart.** Najedź myszką, a stos się rozłoży. Każda karteczka to projekt z zadaniami, klientem, tagami, terminem i przypomnieniami.
+**Karteczki na pulpicie Maca, ułożone w stos jak talia kart.** Najedź myszką, a stos się rozłoży. Każda karteczka to projekt z zadaniami, klientem, tagami, terminem i przypomnieniami. Możesz do niej dołączać pliki: PDF-y, zdjęcia i inne.
 
-- **Instalacja:** pobierz **Stackie-1.0.zip** z zakładki [Releases](../../releases), rozpakuj i przenieś **Stosik.app** do **Aplikacji**.
+- **Instalacja:** pobierz **Stackie-1.1.zip** z zakładki [Releases](../../releases), rozpakuj i przenieś **Stosik.app** do **Aplikacji**.
 - **Pierwsze uruchomienie:** otwórz dwuklikiem. Apka jest podpisana i sprawdzona przez Apple, więc macOS jej nie blokuje.
 - **Gdzie jest:** Stosik siedzi w pasku menu i na pulpicie, bez ikony w Docku. Okienko powitalne pokaże, co umie, i poprosi o zgody: powiadomienia do przypomnień oraz mikrofon i rozpoznawanie mowy do dyktowania.
 - **Wymagania:** macOS 14 albo nowszy, Mac z Apple Silicon albo z Intelem.

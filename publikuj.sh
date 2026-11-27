@@ -23,5 +23,5 @@ spctl --assess --type execute --verbose "$A"
 rm -f "$ZIP"; ditto -c -k --keepParent "$A" "$ZIP"
 echo "Gotowe: $ZIP"
 if [[ "$1" == "--github" ]]; then
-  gh release create "v$VER" "$ZIP" --repo woreczko/stackie --target main --title "Stackie $VER" --generate-notes
+  gh release create "v$VER" "$ZIP" --repo woreczko/stackie --target main --title "Stackie $VER" --notes-file "wersje/notatki-$VER.md"
 fi

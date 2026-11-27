@@ -26,6 +26,9 @@ enum StackLayout {
         wide = inRow > 1 ? min(204, (avail - cardW) / CGFloat(inRow - 1)) : 204
         rows = (items + perRow - 1) / perRow
     }
+    /// Lewa krawędź paska: pod środkiem pierwszej karteczki (stoi tam i w złożonym, i w rozłożonym stosie;
+    /// rozwinięty pasek rośnie w prawo, żeby ikony nie uciekały spod kursora).
+    static let toolX: CGFloat = padX + cardW / 2 - 42
 
     // Mała karteczka-kalendarz: zawsze za całym stosem.
     static let calW: CGFloat = cardW, calH: CGFloat = cardH
@@ -119,11 +122,11 @@ final class UIState: ObservableObject {
         let ty = StackLayout.toolbarY(spread)
         // przypisanie tylko przy zmianie: każde przypisanie @Published przerysowuje cały stos (60 razy na sekundę)
         let overBar = p.map { $0.y > ty - 6 && $0.y < ty + StackLayout.toolbarH + 8
-            && $0.x > StackLayout.padX - 8 && $0.x < StackLayout.padX + 200 } ?? false
+            && $0.x > StackLayout.toolX - 8 && $0.x < StackLayout.toolX + 200 } ?? false
         if overBar != toolbarHover { toolbarHover = overBar }
         var icon: Int? = nil
         if toolbarHover, let p {
-            let k = Int(floor((p.x - StackLayout.padX - 6) / 24))
+            let k = Int(floor((p.x - StackLayout.toolX - 6) / 24))
             if (0...(toolExpanded ? 3 : 1)).contains(k) && p.y >= ty && p.y <= ty + StackLayout.toolbarH { icon = k }
         }
         if icon != toolIcon { toolIcon = icon }
@@ -304,7 +307,7 @@ struct StackView: View {
                 .help(L("Kalendarz i podsumowanie miesiąca"))
             Toolbar(count: notes.count, newNote: newNote)
                 .environmentObject(ui).environmentObject(store)
-                .offset(x: StackLayout.padX, y: StackLayout.toolbarY(ui.spread || ui.toolbarHover && ui.spread))
+                .offset(x: StackLayout.toolX, y: StackLayout.toolbarY(ui.spread || ui.toolbarHover && ui.spread))
     
                 .zIndex(3000)
         }

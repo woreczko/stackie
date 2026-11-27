@@ -79,7 +79,7 @@ struct CardView: View {
 
             Spacer(minLength: 0)
 
-            if !note.tags.isEmpty {
+            if !note.tags.isEmpty || !note.files.isEmpty {
                 HStack(spacing: 4) {
                     ForEach(note.tags.prefix(2), id: \.self) { t in
                         Button { UIState.shared.setFilter(tag: t) } label: { TagPill(text: t, fg: fg, dark: palette(note.color).dark, bg: palette(note.color).bg) }
@@ -87,6 +87,15 @@ struct CardView: View {
                     }
                     if note.tags.count > 2 {
                         Text("+\(note.tags.count - 2)").font(.system(size: 10.5, weight: .semibold)).foregroundStyle(fg.opacity(0.55))
+                    }
+                    if !note.files.isEmpty {
+                        Spacer(minLength: 4)
+                        HStack(spacing: 2) {
+                            Image(systemName: "paperclip").font(.system(size: 10, weight: .bold))
+                            Text("\(note.files.count)").font(.system(size: 11, weight: .semibold).monospacedDigit())
+                        }
+                        .foregroundStyle(fg.opacity(0.6))
+                        .help(LF("Pliki: %d", note.files.count))
                     }
                 }
                 .padding(.bottom, note.tasks.isEmpty ? 0 : 9)

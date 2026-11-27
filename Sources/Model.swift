@@ -10,6 +10,13 @@ struct TaskItem: Codable, Identifiable, Equatable {
     var doneAt: Date? = nil
 }
 
+/// Plik dołączony do karteczki. Kopia leży w zalaczniki/<id karteczki>/<id pliku>/<nazwa>.
+struct Attachment: Codable, Identifiable, Equatable {
+    var id = UUID()
+    var name = ""
+    var size: Int64 = 0
+}
+
 struct Note: Codable, Identifiable, Equatable {
     var id = UUID()
     var title = ""
@@ -32,6 +39,7 @@ struct Note: Codable, Identifiable, Equatable {
     /// Drzemka podskakiwania (jak w budziku) i wyciszenie dla danego terminu.
     var hopSnoozeUntil: Date? = nil
     var hopMutedFor: Date? = nil
+    var files: [Attachment] = []
 
     var remind: Bool { !alerts.isEmpty && deadline != nil }
     var hopMuted: Bool { hopMutedFor != nil && hopMutedFor == deadline }
@@ -49,7 +57,7 @@ struct Note: Codable, Identifiable, Equatable {
 }
 
 extension Note {
-    enum K: String, CodingKey { case id, title, body, color, priority, deadline, hasTime, tasks, created, archived, archivedAt, tags, client, project, remind, alerts, deletedAt, hopSnoozeUntil, hopMutedFor }
+    enum K: String, CodingKey { case id, title, body, color, priority, deadline, hasTime, tasks, created, archived, archivedAt, tags, client, project, remind, alerts, deletedAt, hopSnoozeUntil, hopMutedFor, files }
     init(from d: Decoder) throws {
         let c = try d.container(keyedBy: K.self)
         id = try c.decode(UUID.self, forKey: .id)
@@ -69,6 +77,7 @@ extension Note {
         deletedAt = try c.decodeIfPresent(Date.self, forKey: .deletedAt)
         hopSnoozeUntil = try c.decodeIfPresent(Date.self, forKey: .hopSnoozeUntil)
         hopMutedFor = try c.decodeIfPresent(Date.self, forKey: .hopMutedFor)
+        files = try c.decodeIfPresent([Attachment].self, forKey: .files) ?? []
         alerts = try c.decodeIfPresent([Int].self, forKey: .alerts)
             ?? ((try c.decodeIfPresent(Bool.self, forKey: .remind)) == true ? [1440, 0] : [])
     }
@@ -79,7 +88,7 @@ extension Note {
         if let p, project.caseInsensitiveCompare(p) != .orderedSame { return false }
         let q = query.trimmingCharacters(in: .whitespaces)
         guard !q.isEmpty else { return true }
-        let hay = ([title, body, client, project] + tags + tasks.map(\.text)).joined(separator: "\n")
+        let hay = ([title, body, client, project] + tags + tasks.map(\.text) + files.map(\.name)).joined(separator: "\n")
         return hay.range(of: q, options: [.caseInsensitive, .diacriticInsensitive]) != nil
     }
 }
@@ -191,6 +200,45 @@ final class Store: ObservableObject {
         if let d = try? Data(contentsOf: tagFile), let m = try? JSONDecoder().decode([String: Int].self, from: d) { tagColors = m }
         loading = false
         save()
+        cleanFiles()
+    }
+
+    // MARK: załączniki (kopie plików, żeby nie zginęły, gdy oryginał się przesunie)
+    var filesDir: URL { dir.appendingPathComponent("zalaczniki") }
+    func fileURL(_ note: UUID, _ a: Attachment) -> URL {
+        filesDir.appendingPathComponent(note.uuidString).appendingPathComponent(a.id.uuidString).appendingPathComponent(a.name)
+    }
+    /// Kopiuje pliki do karteczki. Foldery i pliki, których nie da się skopiować, pomija.
+    func attach(_ id: UUID, _ urls: [URL]) {
+        guard let i = notes.firstIndex(where: { $0.id == id }) else { return }
+        let fm = FileManager.default
+        var added: [Attachment] = []
+        for u in urls {
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: u.path, isDirectory: &isDir), !isDir.boolValue else { continue }
+            let a = Attachment(name: u.lastPathComponent,
+                               size: Int64((try? u.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0))
+            let dest = fileURL(id, a)
+            do {
+                try fm.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try fm.copyItem(at: u, to: dest)
+                added.append(a)
+            } catch { continue }
+        }
+        if !added.isEmpty { notes[i].files += added }
+    }
+    func detach(_ id: UUID, _ a: Attachment) {
+        guard let i = notes.firstIndex(where: { $0.id == id }) else { return }
+        notes[i].files.removeAll { $0.id == a.id }
+        try? FileManager.default.removeItem(at: fileURL(id, a).deletingLastPathComponent())
+    }
+    /// Usuwa kopie plików karteczek, których nie ma już ani na stosie, ani w koszu.
+    func cleanFiles() {
+        let keep = Set((notes + trash).map(\.id.uuidString))
+        let fm = FileManager.default
+        for d in (try? fm.contentsOfDirectory(atPath: filesDir.path)) ?? [] where !keep.contains(d) && !d.hasPrefix(".") {
+            try? fm.removeItem(at: filesDir.appendingPathComponent(d))
+        }
     }
 
     var active: [Note] { notes.filter { !$0.archived } }
@@ -271,8 +319,8 @@ final class Store: ObservableObject {
         if n.archived { notes.append(n) } else { notes.insert(n, at: 0) }
         saveTrash()
     }
-    func deleteForever(_ id: UUID) { trash.removeAll { $0.id == id }; saveTrash() }
-    func emptyTrash() { trash.removeAll(); saveTrash() }
+    func deleteForever(_ id: UUID) { trash.removeAll { $0.id == id }; saveTrash(); cleanFiles() }
+    func emptyTrash() { trash.removeAll(); saveTrash(); cleanFiles() }
     func daysLeft(_ n: Note) -> Int {
         let gone = (n.deletedAt ?? Date()).addingTimeInterval(Double(Store.TRASH_DAYS) * 86400)
         return max(0, Int(ceil(gone.timeIntervalSinceNow / 86400)))
