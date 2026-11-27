@@ -71,9 +71,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     static weak var shared: AppDelegate?
 
+    /// Ukryte menu „Edycja”: apka z paska menu nie ma zwykłego menu, a bez niego w polach tekstowych
+    /// nie działają ⌘C, ⌘V, ⌘X, ⌘A, ⌘Z (skróty idą przez menu).
+    private func installEditMenu() {
+        let main = NSMenu()
+        let editItem = NSMenuItem()
+        let edit = NSMenu(title: L("Edycja"))
+        edit.addItem(withTitle: L("Cofnij"), action: Selector(("undo:")), keyEquivalent: "z")
+        let redo = edit.addItem(withTitle: L("Ponów"), action: Selector(("redo:")), keyEquivalent: "z")
+        redo.keyEquivalentModifierMask = [.command, .shift]
+        edit.addItem(.separator())
+        edit.addItem(withTitle: L("Wytnij"), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        edit.addItem(withTitle: L("Kopiuj"), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: L("Wklej"), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        edit.addItem(withTitle: L("Zaznacz wszystko"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editItem.submenu = edit
+        main.addItem(editItem)
+        NSApp.mainMenu = main
+    }
+
     func applicationDidFinishLaunching(_ n: Notification) {
         AppDelegate.shared = self
         Lang.resolve()
+        installEditMenu()
         if Reminders.enabled { UNUserNotificationCenter.current().delegate = self }
         Reminders.setup()
         buildStack()
@@ -848,6 +868,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                 w.orderFront(nil)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { shot(w, t.isEmpty ? "19_szybka_pusta" : "19_szybka"); w.orderOut(nil) }
             }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 12.6) {
+            // dużo zadań: „Dodaj zadanie” przy dolnej krawędzi, notatka schowana
+            let id = self.store.add()
+            if let i = self.store.notes.firstIndex(where: { $0.id == id }) {
+                self.store.notes[i].title = "FEELBACK"; self.store.notes[i].color = 6
+                self.store.notes[i].tasks = (1...16).map { var t = TaskItem(); t.text = "Zadanie numer \($0)"; t.done = $0 > 10; return t }
+            }
+            let w = NSWindow(contentRect: NSRect(x: 300, y: 100, width: 400, height: 640), styleMask: [.borderless], backing: .buffered, defer: false)
+            w.isOpaque = false; w.backgroundColor = .clear
+            w.contentView = NSHostingView(rootView: EditorView(id: id, close: {}).environmentObject(self.store))
+            w.orderFront(nil)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { shot(w, "20_duzo_zadan"); w.orderOut(nil) }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 12.8) {
             // „Na dziś” przesunięta na trzecie miejsce (po zrzucie: z powrotem, to ustawienie użytkownika)

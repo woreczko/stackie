@@ -16,6 +16,7 @@ struct EditorView: View {
     @State private var rowH: [UUID: CGFloat] = [:]   // wysokości wierszy (długie zadania zawijają się w kilka linii)
     @State private var liftTask: UUID?
     @State private var dropping = false
+    @State private var tasksH: CGFloat = 0   // wysokość listy zadań (do ustawienia „Dodaj zadanie” i notatki)
     @State private var smartBusy = false
     @State private var lastSubmit = Date.distantPast   // Enter: nowe zadanie tylko raz (onSubmit albo nowa linia)
     @State private var smartShown = false
@@ -103,17 +104,30 @@ struct EditorView: View {
 
             Divider().overlay(fg.opacity(0.15)).padding(.vertical, 12)
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text(L("Zadania")).font(.system(size: 11, weight: .bold)).tracking(0.8).textCase(.uppercase)
-                            .foregroundStyle(fg.opacity(0.6))
-                        Spacer()
-                        if !note.wrappedValue.tasks.isEmpty {
-                            Text("\(note.wrappedValue.doneCount)/\(note.wrappedValue.tasks.count)")
-                                .font(.system(size: 11, weight: .semibold).monospacedDigit()).foregroundStyle(fg.opacity(0.6))
-                        }
-                    }
+            // Zadania: „Dodaj zadanie” stoi tuż pod listą i zjeżdża z nią w dół, aż oprze się o dół okna;
+            // wtedy lista przewija się nad nim, a notatka się chowa.
+            GeometryReader { geo in
+                let headerH: CGFloat = 24, addH: CGFloat = 34
+                // zadania mieszczą się: całość przewija się jak dawniej (notatka pod spodem);
+                // nie mieszczą się: „Dodaj zadanie” przy dolnej krawędzi, notatka schowana
+                let showNote = tasksH + headerH + addH <= geo.size.height
+                let listH = max(0, min(tasksH, geo.size.height - headerH - addH))
+                VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text(L("Zadania")).font(.system(size: 11, weight: .bold)).tracking(0.8).textCase(.uppercase)
+                    .foregroundStyle(fg.opacity(0.6))
+                Spacer()
+                if !note.wrappedValue.tasks.isEmpty {
+                    Text("\(note.wrappedValue.doneCount)/\(note.wrappedValue.tasks.count)")
+                        .font(.system(size: 11, weight: .semibold).monospacedDigit()).foregroundStyle(fg.opacity(0.6))
+                }
+            }
+                    .frame(height: headerH, alignment: .top)
+                    ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 8) {
                     ForEach(note.tasks) { $t in
                         let dragging = dragTask == t.id
                         HStack(alignment: .top, spacing: 9) {
@@ -140,6 +154,14 @@ struct EditorView: View {
                                 .padding(.top, 4)
                                 .focused($focus, equals: t.id)
                                 .onSubmit { lastSubmit = Date(); insertTask(after: t.id) }
+                                // pole wielolinijkowe nie zawsze zgłasza Enter: łapiemy klawisz sam (⇧↩ albo ⌥↩ zostaje nową linią)
+                                .onKeyPress(.return) {
+                                    if NSEvent.modifierFlags.contains(.shift) || NSEvent.modifierFlags.contains(.option) { return .ignored }
+                                    guard Date().timeIntervalSince(lastSubmit) > 0.3 else { return .handled }
+                                    lastSubmit = Date()
+                                    insertTask(after: t.id)
+                                    return .handled
+                                }
                                 .onChange(of: t.text) { _, v in
                                     // Enter (albo wklejony tekst z nową linią) robi nowe zadanie, nie drugi wiersz
                                     guard v.contains("\n") else { return }
@@ -181,25 +203,37 @@ struct EditorView: View {
                         .transaction { if dragging && !$0[LiftKey.self] { $0.animation = nil } }
                         .onHover { h in hoverTask = h ? t.id : (hoverTask == t.id ? nil : hoverTask) }
                     }
-                    HStack(spacing: 16) {
-                        Button { insertTask(after: nil) } label: {
-                            HStack(spacing: 9) {
-                                Image(systemName: "plus").font(.system(size: 10, weight: .bold)).frame(width: 18, height: 18)
-                                Text(L("Dodaj zadanie")).font(.system(size: 13, weight: .medium))
                             }
-                            .foregroundStyle(fg.opacity(0.6)).contentShape(Rectangle())
+                            .padding(.trailing, 6)
+                            .background(GeometryReader { g in Color.clear.preference(key: TasksHeight.self, value: g.size.height) })
                         }
-                        .buttonStyle(.plain)
-                        Button { AppDelegate.shared?.startDictation(into: id) } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "mic.fill").font(.system(size: 10, weight: .bold))
-                                Text(L("Dyktuj")).font(.system(size: 13, weight: .medium))
-                            }
-                            .foregroundStyle(fg.opacity(0.6)).contentShape(Rectangle())
+                        .scrollIndicators(.never)
+                        .frame(height: listH)
+                        .onChange(of: focus) { _, f in
+                            if let f { withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(f, anchor: .center) } }
                         }
-                        .buttonStyle(.plain).help(L("Mów, co jest do zrobienia. Każde zdanie to osobne zadanie."))
                     }
-
+            HStack(spacing: 16) {
+                Button { insertTask(after: nil) } label: {
+                    HStack(spacing: 9) {
+                        Image(systemName: "plus").font(.system(size: 10, weight: .bold)).frame(width: 18, height: 18)
+                        Text(L("Dodaj zadanie")).font(.system(size: 13, weight: .medium))
+                    }
+                    .foregroundStyle(fg.opacity(0.6)).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                Button { AppDelegate.shared?.startDictation(into: id) } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "mic.fill").font(.system(size: 10, weight: .bold))
+                        Text(L("Dyktuj")).font(.system(size: 13, weight: .medium))
+                    }
+                    .foregroundStyle(fg.opacity(0.6)).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain).help(L("Mów, co jest do zrobienia. Każde zdanie to osobne zadanie."))
+            }
+                    .frame(height: addH, alignment: .center)
+                    if showNote {
+                        VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text(L("Notatka")).font(.system(size: 11, weight: .bold)).tracking(0.8).textCase(.uppercase)
                             .foregroundStyle(fg.opacity(0.6))
@@ -244,10 +278,17 @@ struct EditorView: View {
                         .padding(.horizontal, -5)
                     }
                     FilesSection(id: id, fg: fg)
+                        }
+                        .padding(.trailing, 6)
+                    }
+                    }
+                    }
+                    .scrollIndicators(.never)
+                    .scrollDisabled(!showNote)
+                    Spacer(minLength: 0)
                 }
-                .padding(.trailing, 6)
             }
-            .scrollIndicators(.never)
+            .onPreferenceChange(TasksHeight.self) { tasksH = $0 }
 
             HStack {
                 Button { close(); store.delete(id) } label: {
@@ -454,10 +495,12 @@ struct EditorView: View {
     }
 
     @discardableResult
-    private func insertTask(after tid: UUID?, text: String = "") -> UUID {
+    private func insertTask(after tid: UUID?, text: String = "", atTop: Bool = false) -> UUID {
         let note = store.binding(id)
         var t = TaskItem(); t.text = text
-        if let tid, let i = note.wrappedValue.tasks.firstIndex(where: { $0.id == tid }) {
+        if atTop {
+            note.wrappedValue.tasks.insert(t, at: 0)
+        } else if let tid, let i = note.wrappedValue.tasks.firstIndex(where: { $0.id == tid }) {
             note.wrappedValue.tasks.insert(t, at: i + 1)
         } else {
             note.wrappedValue.tasks.append(t)
@@ -698,8 +741,8 @@ struct NameField: View {
                         .focused($focused)
                         .onSubmit { text = q }
                 }
-                .padding(.horizontal, 8).frame(height: 22)
-                .background(RoundedRectangle(cornerRadius: 6).fill(fg.opacity(focused ? 0.09 : 0.05)))
+                .padding(.horizontal, 10).frame(height: 22)
+                .background(Capsule().fill(fg.opacity(focused ? 0.09 : 0.05)))   // pastylka jak pole tagów
             }
             if focused && !hints.isEmpty {
                 HStack(spacing: 5) {
@@ -916,3 +959,10 @@ struct DatePill: View {
     }
 }
 
+
+
+/// Wysokość listy zadań w edytorze.
+private struct TasksHeight: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
