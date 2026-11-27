@@ -16,8 +16,6 @@ struct EditorView: View {
     @State private var rowH: [UUID: CGFloat] = [:]   // wysokości wierszy (długie zadania zawijają się w kilka linii)
     @State private var liftTask: UUID?
     @State private var dropping = false
-    @State private var tasksH: CGFloat = 0
-    @State private var noteOpen = false   // schowana notatka otwarta przyciskiem „Notatka”   // wysokość listy zadań (do ustawienia „Dodaj zadanie” i notatki)
     @State private var smartBusy = false
     @State private var lastSubmit = Date.distantPast   // Enter: nowe zadanie tylko raz (onSubmit albo nowa linia)
     @State private var smartShown = false
@@ -497,12 +495,10 @@ struct EditorView: View {
     }
 
     @discardableResult
-    private func insertTask(after tid: UUID?, text: String = "", atTop: Bool = false) -> UUID {
+    private func insertTask(after tid: UUID?, text: String = "") -> UUID {
         let note = store.binding(id)
         var t = TaskItem(); t.text = text
-        if atTop {
-            note.wrappedValue.tasks.insert(t, at: 0)
-        } else if let tid, let i = note.wrappedValue.tasks.firstIndex(where: { $0.id == tid }) {
+        if let tid, let i = note.wrappedValue.tasks.firstIndex(where: { $0.id == tid }) {
             note.wrappedValue.tasks.insert(t, at: i + 1)
         } else {
             note.wrappedValue.tasks.append(t)
@@ -527,6 +523,10 @@ struct EditorView: View {
               let i = store.notes.firstIndex(where: { $0.id == target }) else { return }
         var t = task
         if copy { t.id = UUID() }
+        // puste zadanie z nowej karteczki nie zostaje nad przeniesionym
+        while let last = store.notes[i].tasks.last, last.text.trimmingCharacters(in: .whitespaces).isEmpty {
+            store.notes[i].tasks.removeLast()
+        }
         store.notes[i].tasks.append(t)
         if !copy { note.wrappedValue.tasks.removeAll { $0.id == tid } }
         NSSound(named: "Pop")?.play()

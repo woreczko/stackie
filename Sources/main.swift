@@ -258,6 +258,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     /// Szybka notatka z rogu ekranu: małe okienko na środku ekranu z kursorem (pisanie albo dyktowanie).
     func showQuickNote() {
+        // już otwarta: tylko na wierzch (nowy widok skasowałby wpisany tekst i dyktowanie)
+        if let w = quickWin, w.isVisible, w.contentView != nil {
+            NSApp.activate(ignoringOtherApps: true); w.makeKeyAndOrderFront(nil); return
+        }
         let size = NSSize(width: 460, height: 320)
         let p = quickWin ?? Panel(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless], backing: .buffered, defer: false)
         p.isOpaque = false; p.backgroundColor = .clear; p.hasShadow = true
