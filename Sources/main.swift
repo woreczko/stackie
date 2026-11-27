@@ -874,6 +874,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             let id = self.store.add()
             if let i = self.store.notes.firstIndex(where: { $0.id == id }) {
                 self.store.notes[i].title = "FEELBACK"; self.store.notes[i].color = 6
+                self.store.notes[i].tags = ["pilne", "faktura", "druk", "social media", "klient czeka", "poprawki", "logo"]
                 self.store.notes[i].tasks = (1...16).map { var t = TaskItem(); t.text = "Zadanie numer \($0)"; t.done = $0 > 10; return t }
             }
             let w = NSWindow(contentRect: NSRect(x: 300, y: 100, width: 400, height: 640), styleMask: [.borderless], backing: .buffered, defer: false)

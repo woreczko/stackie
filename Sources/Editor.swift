@@ -589,31 +589,54 @@ struct TagEditor: View {
             !tags.contains { $0.caseInsensitiveCompare(t) == .orderedSame } &&
             (q.isEmpty || t.range(of: q, options: [.caseInsensitive, .diacriticInsensitive, .anchored]) != nil)
         }.prefix(6)
+        let typing = focused || !draft.isEmpty
         VStack(alignment: .leading, spacing: 6) {
-            FlowLayout(spacing: 5) {
-                ForEach(tags, id: \.self) { t in
-                    Button { tags.removeAll { $0 == t } } label: { TagPill(text: t, fg: fg, dark: dark, removable: true, bg: bg) }
-                        .buttonStyle(.plain).help(L("Usuń tag"))
+            // Pole do wpisywania stoi zawsze z prawej (ta sama tożsamość widoku, więc nie gubi kursora).
+            // Przy pisaniu tagi są w jednym wierszu i uciekają w lewo; potem zawijają się w kolejne wiersze.
+            HStack(alignment: .top, spacing: 6) {
+                if !tags.isEmpty {
+                    Group {
+                        if typing {
+                            ScrollViewReader { proxy in
+                                ScrollView(.horizontal) {
+                                    HStack(spacing: 5) { chips }
+                                }
+                                .scrollIndicators(.never)
+                                .defaultScrollAnchor(.trailing)
+                                .frame(height: 22)
+                                .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.08),
+                                                             .init(color: .black, location: 1)], startPoint: .leading, endPoint: .trailing))
+                                .onChange(of: tags) { _, t in
+                                    if let last = t.last { withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(last, anchor: .trailing) } }
+                                }
+                            }
+                        } else {
+                            FlowLayout(spacing: 5) { chips }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                HStack(spacing: 3) {
-                    Text("#").font(.system(size: 11, weight: .semibold)).foregroundStyle(fg.opacity(0.45))
+                HStack(spacing: 4) {
+                    Text("#").font(.system(size: 12, weight: .semibold)).foregroundStyle(fg.opacity(0.45))
                     TextField("", text: $draft)
                         .overlay(alignment: .leading) {
                             if draft.isEmpty {
-                                Text(tags.isEmpty ? L("np. pilne, faktura") : L("tag")).font(.system(size: 11.5))
+                                Text(tags.isEmpty ? L("np. pilne, faktura") : L("tag")).font(.system(size: 13))
                                     .foregroundStyle(fg.opacity(0.35)).allowsHitTesting(false)
                             }
                         }
                         .textFieldStyle(.plain)
-                        .font(.system(size: 11.5))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(fg)
                         .focused($focused)
                         .onSubmit { add(draft) }
-                        .frame(width: tags.isEmpty ? 130 : 70)
                 }
-                .padding(.horizontal, 8).frame(height: 20)
+                .padding(.horizontal, 10).frame(height: 22)
+                .frame(width: tags.isEmpty ? nil : 92)
+                .frame(maxWidth: tags.isEmpty ? .infinity : nil, alignment: .leading)
                 .background(Capsule().strokeBorder(fg.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
             }
+            .animation(.easeInOut(duration: 0.18), value: typing)
             if (focused || !draft.isEmpty) && !hints.isEmpty {
                 HStack(spacing: 5) {
                     ForEach(Array(hints), id: \.self) { t in
@@ -626,6 +649,25 @@ struct TagEditor: View {
                     }
                 }
             }
+        }
+    }
+
+    /// Tagi jako pastylki tej samej wysokości co pola klienta i projektu.
+    private var chips: some View {
+        ForEach(tags, id: \.self) { t in
+            Button { tags.removeAll { $0 == t } } label: {
+                HStack(spacing: 5) {
+                    Text(t.uppercased()).tracking(0.5).lineLimit(1).truncationMode(.tail).frame(maxWidth: 140)
+                    Image(systemName: "xmark").font(.system(size: 7, weight: .bold)).opacity(0.6)
+                }
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(dark ? Color.ink : bg)
+                .fixedSize()
+                .padding(.horizontal, 10).frame(height: 22)
+                .background(Capsule().fill(dark ? Color(hex: 0xF7F1E7).opacity(0.9) : Color.ink.opacity(0.8)))
+                .contentShape(Capsule())
+            }
+            .buttonStyle(.plain).help(L("Usuń tag")).id(t)
         }
     }
 
