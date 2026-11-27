@@ -5,7 +5,7 @@ import UserNotifications
 
 // MARK: - Okienko powitalne: strony z animacjami możliwości i historia zmian
 
-let APP_VERSION = "1.1"
+let APP_VERSION = "1.2"
 
 struct WelcomePage { let title: String; let text: String; let demo: AnyView }
 
@@ -13,12 +13,15 @@ struct WelcomeView: View {
     var close: () -> Void
     @State private var page: Int
 
+    /// Strona „Co nowego” (po stronach z pokazami i zgodach).
+    static var changelogPage: Int { WelcomeView(close: {}).pages.count + 1 }
+
     init(close: @escaping () -> Void, startPage: Int = 0) {
         self.close = close
         _page = State(initialValue: startPage)
     }
 
-    private var pages: [WelcomePage] {
+    var pages: [WelcomePage] {
         [
             WelcomePage(title: L("Witaj w Stosiku"), text: L("Karteczki leżą na pulpicie jak talia kart. Najedź myszką, a stos się rozłoży."), demo: AnyView(DemoStack())),
             WelcomePage(title: L("Projekty i zadania"), text: L("Jedna karteczka to jeden projekt. Odhaczasz kółeczka, a pasek pokazuje postęp. Zadania przesuwasz za uchwyt."), demo: AnyView(DemoTasks())),
@@ -103,6 +106,10 @@ struct WelcomeView: View {
 struct Release { let version: String; let date: String; let items: [String] }
 
 var RELEASES: [Release] {[
+    Release(version: "1.2", date: "27.11.2026", items: [
+        L("Samoczynne aktualizacje: raz dziennie Stackie sprawdza nową wersję i instaluje ją, gdy nie używasz komputera"),
+        L("Wyłącznik w menu w pasku: Ustawienia → Aktualizuj automatycznie"),
+    ]),
     Release(version: "1.1", date: "27.11.2026", items: [
         L("Pliki przy karteczce: przeciągnij PDF, zdjęcie albo inny plik, Stosik trzyma kopię"),
         L("Data i godzina terminu jako pigułki z kalendarzem"),

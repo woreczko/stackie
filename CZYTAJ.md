@@ -33,11 +33,19 @@ Karteczki na ekranie Maca ułożone w stos (wersja 1.0, 27.11.2026). Po angielsk
 - Pokazuje się samo przy pierwszym uruchomieniu i po każdej nowej wersji (UserDefaults „welcomeSeen” ≠ APP_VERSION); ręcznie: koło zębate → „Witaj i co nowego” albo menu w górnym pasku.
 
 ### Jak wydać nową wersję
-1. Podnieś `APP_VERSION` w Sources/Welcome.swift i `CFBundleShortVersionString` / `CFBundleVersion` w zbuduj.sh.
+1. Podnieś `APP_VERSION` w Sources/Welcome.swift (zbuduj.sh bierze numer stamtąd).
 2. Dopisz na górze `RELEASES` (Welcome.swift) wpis z wersją, datą i 2–4 punktami (każdy w `L("…")`).
 3. Dopisz angielskie tłumaczenia nowych napisów w Sources/Lang.swift (szybki test: skrypt z sesji szuka brakujących kluczy).
 4. `./testuj.sh` (zrzuty po polsku i angielsku, m.in. test/14_witaj_*.png), obejrzyj, potem `./zbuduj.sh`.
-5. Przy starcie nowej wersji okienko powitalne pokaże się samo z „Co nowego”.
+5. Notatki do wydania w wersje/notatki-<wersja>.md (EN i PL), commit, push, potem `./publikuj.sh --github`.
+6. Przy starcie nowej wersji okienko powitalne pokaże się samo z „Co nowego”; po cichej aktualizacji zamiast niego jest powiadomienie „Zaktualizowano do …” (klik = „Co nowego”).
+
+### Samoczynne aktualizacje (od 1.2, Sources/Updater.swift)
+- Raz na dobę (pierwszy raz minutę po starcie) pyta GitHuba o najnowsze wydanie (api.github.com/repos/woreczko/stackie/releases/latest). Nowsza wersja: pobiera zip do Application Support/Stosik/aktualizacja, rozpakowuje i sprawdza podpis: Developer ID od Apple i ten sam zespół (Team ID), którym podpisana jest działająca apka.
+- Podmienia się, gdy od 10 minut nikt nie rusza myszą ani klawiaturą i żadna karteczka nie jest otwarta (wtedy uruchamia się ponownie), albo przy zamykaniu apki. Osobny proces /bin/sh czeka na zamknięcie, podmienia apkę (przy błędzie wraca stara) i sprząta folder.
+- Wyłącznik w menu w pasku: Ustawienia → „Aktualizuj automatycznie” (UserDefaults „autoUpdate”).
+- Apka z `./zbuduj.sh` (podpis ad hoc) nie ma Team ID, więc się nie aktualizuje i nie pokazuje wyłącznika. Aktualizuje się tylko wersja z publikuj.sh.
+- Test: `STOSIK_UPDATE_NOW=1` sprawdza od razu i podmienia bez czekania na bezczynność. Sprawdzone 27.11.2026: podpisana kopia z numerem 1.0.9 w osobnym folderze sama pobrała 1.1, podmieniła się i uruchomiła; kopia bez podpisu nie przechodzi wymagań podpisu.
 - Po rozłożeniu karty układają się w rzędy (StackLayout.perRow z szerokości ekranu: laptop ok. 6, duży monitor więcej); pasek zjeżdża pod ostatni rząd. Do testu STOSIK_SCREENW=1512.
 - Drzemka: dzwoneczek na karteczce w stosie = menu (odłóż 10/30 min, 1 godz., do jutra rano, wycisz do zmiany terminu, włącz). Dotyczy tylko podskakiwania; powiadomienia bez zmian. Podskok co 20 s.
 - Wydajność: mysz jest czytana zegarem 60 razy na sekundę, więc w UIState.mouse wartości @Published przypisuj tylko przy zmianie (inaczej cały stos przerysowuje się 60×/s; tak było do 27.11: 44% CPU w spoczynku, po poprawce ok. 1%). Gdy kursor jest daleko, pollMouse kończy od razu.
@@ -45,5 +53,5 @@ Karteczki na ekranie Maca ułożone w stos (wersja 1.0, 27.11.2026). Po angielsk
 
 ## Publikacja (podpis Apple i GitHub)
 - `./publikuj.sh` buduje apkę dla Apple Silicon i Intela, podpisuje certyfikatem „Developer ID Application” (hardened runtime, uprawnienia w Stosik.entitlements), wysyła do notaryzacji Apple, dokleja potwierdzenie i pakuje build/Stackie-<wersja>.zip. `--github` od razu tworzy wydanie na github.com/woreczko/stackie.
-- Jednorazowo: certyfikat Developer ID Application (Xcode → Settings → Accounts → Manage Certificates → + ) i profil notaryzacji `xcrun notarytool store-credentials stackie` (Apple ID, Team ID, hasło dla aplikacji z account.apple.com).
-- git push z tego Maca wymaga jednorazowo `gh auth setup-git`.
+- Jednorazowo (zrobione 27.11.2026): certyfikat Developer ID Application (Xcode widzi rolę Admin i odmawia, więc przez developer.apple.com z CSR zrobionym w openssl; klucz także w ~/Library/Application Support/StackieSigning/) i profil notaryzacji `xcrun notarytool store-credentials stackie` (Apple ID, Team ID, hasło dla aplikacji z account.apple.com).
+- git push bez zmiany globalnego gita: `git push https://x-access-token:$(gh auth token)@github.com/woreczko/stackie.git main`.

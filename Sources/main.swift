@@ -72,9 +72,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             self?.store.objectWillChange.send(); self?.updateStatusTitle()
         }
         if let snap { runSnapshots(snap) }
-        else if UserDefaults.standard.string(forKey: "welcomeSeen") != APP_VERSION {
+        else if Updater.announceIfUpdated() {
+            // po cichej aktualizacji tylko powiadomienie, bez całego powitania
+            UserDefaults.standard.set(APP_VERSION, forKey: "welcomeSeen")
+        } else if UserDefaults.standard.string(forKey: "welcomeSeen") != APP_VERSION {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { self.showWelcome() }
         }
+        Updater.shared.start()
+    }
+
+    func applicationWillTerminate(_ n: Notification) {
+        // pobrana nowa wersja wchodzi przy zamknięciu (następne uruchomienie to już ona)
+        Updater.shared.install(relaunch: false)
     }
 
     // MARK: stos
@@ -311,7 +320,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
     }
 
-    func showWelcome() {
+    func showWelcome(startPage: Int = 0) {
         let size = NSSize(width: 560, height: 470)
         let p = welcomeWin ?? Panel(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless], backing: .buffered, defer: false)
         p.isOpaque = false; p.backgroundColor = .clear; p.hasShadow = true
@@ -323,7 +332,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             UserDefaults.standard.set(APP_VERSION, forKey: "welcomeSeen")
             self?.welcomeWin?.orderOut(nil)
             self?.welcomeWin?.contentView = nil   // animacje (TimelineView) przestają liczyć w tle
-        }))
+        }, startPage: startPage))
         host.sizingOptions = []
         p.contentView = host
         let scr = (stack?.screen ?? NSScreen.main)?.visibleFrame ?? .zero
@@ -477,6 +486,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         let login = item(L("Otwieraj przy logowaniu"), #selector(menuLogin), "", "power")
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
         menu.addItem(login)
+        if Updater.shared.teamID != nil {
+            let up = item(L("Aktualizuj automatycznie"), #selector(menuAutoUpdate), "", "arrow.down.circle")
+            up.state = Updater.shared.enabled ? .on : .off
+            menu.addItem(up)
+        }
 
         // Na koniec
         menu.addItem(.separator())
@@ -496,6 +510,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     @objc func menuTag(_ s: NSMenuItem) { ui.setFilter(tag: s.representedObject as? String); stack.orderFrontRegardless() }
     @objc func menuTrash() { toggleTrash() }
     @objc func menuWelcome() { showWelcome() }
+    @objc func menuAutoUpdate() { Updater.shared.enabled.toggle() }
     @objc func menuCalendar() { stack.orderFrontRegardless(); toggleCalendar() }
     @objc func menuLang(_ s: NSMenuItem) {
         guard let code = s.representedObject as? String else { return }
@@ -544,7 +559,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     func userNotificationCenter(_ c: UNUserNotificationCenter, didReceive r: UNNotificationResponse,
                                 withCompletionHandler h: @escaping () -> Void) {
-        if let s = r.notification.request.content.userInfo["note"] as? String, let id = UUID(uuidString: s) {
+        if r.notification.request.content.userInfo["whatsNew"] != nil {
+            DispatchQueue.main.async { self.showWelcome(startPage: WelcomeView.changelogPage) }
+        } else if let s = r.notification.request.content.userInfo["note"] as? String, let id = UUID(uuidString: s) {
             DispatchQueue.main.async {
                 self.stack.orderFrontRegardless()
                 let f = self.stack.frame
