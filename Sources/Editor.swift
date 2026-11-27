@@ -523,12 +523,22 @@ struct DeadlineRow: View {
                 }
             }
             if note.deadline != nil {
-                HStack(spacing: 6) {
-                    let d = Binding(get: { note.deadline ?? Date() }, set: { note.deadline = $0 })
-                    DatePill(date: d, fg: fg)
-                    if note.hasTime { DatePill(date: d, time: true, fg: fg) }
-                    Spacer()
-                    quick(L("Dziś"), 0); quick(L("Jutro"), 1); quick(L("+7 dni"), 7)
+                let d = Binding(get: { note.deadline ?? Date() }, set: { note.deadline = $0 })
+                // w jednym rzędzie, a gdy się nie mieszczą (dłuższe napisy po angielsku): data w jednym, skróty w drugim
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 6) {
+                        DatePill(date: d, fg: fg)
+                        if note.hasTime { DatePill(date: d, time: true, fg: fg) }
+                        Spacer(minLength: 8)
+                        quick(L("Dziś"), 0); quick(L("Jutro"), 1); quick(L("+7 dni"), 7)
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 6) {
+                            DatePill(date: d, fg: fg)
+                            if note.hasTime { DatePill(date: d, time: true, fg: fg) }
+                        }
+                        HStack(spacing: 6) { quick(L("Dziś"), 0); quick(L("Jutro"), 1); quick(L("+7 dni"), 7) }
+                    }
                 }
                 AlertsRow(note: $note, fg: fg)
             }
@@ -546,7 +556,7 @@ struct DeadlineRow: View {
             }
             note.deadline = d
         } label: {
-            Text(t).font(.system(size: 11, weight: .semibold))
+            Text(t).font(.system(size: 11, weight: .semibold)).lineLimit(1).fixedSize()
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(Capsule().fill(fg.opacity(0.1)))
         }
@@ -910,6 +920,7 @@ struct DatePill: View {
             HStack(spacing: 5) {
                 Image(systemName: time ? "clock" : "calendar").font(.system(size: 10, weight: .bold)).opacity(0.7)
                 Text(label).font(.system(size: 11.5, weight: .semibold).monospacedDigit())
+                    .lineLimit(1).fixedSize()   // data i godzina zawsze w jednej linii
             }
             .foregroundStyle(fg)
             .padding(.horizontal, 10).padding(.vertical, 4)
