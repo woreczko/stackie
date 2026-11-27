@@ -566,3 +566,48 @@ func alertAmount(_ m: Int) -> String {
     if m % 60 == 0 { return LF("%d godz.", m / 60) }
     return LF("%d min", m)
 }
+
+// MARK: - Na dziś
+
+/// Jeden wiersz kartki „Na dziś”: klient (albo projekt, albo tytuł) i ile zostało zrobić.
+struct TodayGroup: Identifiable {
+    var id: String { key }
+    var key: String
+    var name: String
+    var client: String
+    var project: String
+    var open = 0
+    var total = 0
+    var notes: [UUID] = []
+    /// Projekty klienta i ile w każdym zostało (pod nazwą klienta, gdy jest ich więcej niż jeden).
+    var projects: [(name: String, open: Int)] = []
+}
+
+extension Store {
+    /// Karteczki z terminem na dziś, zebrane po kliencie, w kolejności ze stosu.
+    func todayGroups(_ notes: [Note], now: Date = Date()) -> [TodayGroup] {
+        var out: [TodayGroup] = []
+        for n in notes {
+            guard let d = n.deadline, Calendar.current.isDate(d, inSameDayAs: now) else { continue }
+            let name = !n.client.isEmpty ? n.client : !n.project.isEmpty ? n.project : (n.title.isEmpty ? L("Bez tytułu") : n.title)
+            let key = (!n.client.isEmpty ? "c:" : !n.project.isEmpty ? "p:" : "t:") + name.lowercased()
+            // karteczka bez zadań liczy się jako jedna rzecz do zrobienia
+            let total = max(1, n.tasks.count), open = n.tasks.isEmpty ? 1 : n.tasks.count - n.doneCount
+            if out.firstIndex(where: { $0.key == key }) == nil {
+                out.append(TodayGroup(key: key, name: name, client: n.client, project: n.client.isEmpty ? n.project : ""))
+            }
+            let i = out.firstIndex { $0.key == key }!
+            out[i].open += open; out[i].total += total; out[i].notes.append(n.id)
+            if !n.client.isEmpty {
+                // karteczka klienta bez projektu liczy się pod swoim tytułem
+                let pname = !n.project.isEmpty ? n.project : (n.title.isEmpty ? L("Bez tytułu") : n.title)
+                if let j = out[i].projects.firstIndex(where: { $0.name.lowercased() == pname.lowercased() }) {
+                    out[i].projects[j].open += open
+                } else {
+                    out[i].projects.append((pname, open))
+                }
+            }
+        }
+        return out
+    }
+}

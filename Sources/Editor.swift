@@ -12,10 +12,17 @@ struct EditorView: View {
     @State private var hoverTask: UUID?
     @State private var dragTask: UUID?
     @State private var dragY: CGFloat = 0
-    @State private var dragShift = 0
+    @State private var dragShift: CGFloat = 0   // o ile punktów wiersz w ręce przeskoczył przez zamiany
+    @State private var rowH: [UUID: CGFloat] = [:]   // wysokości wierszy (długie zadania zawijają się w kilka linii)
     @State private var liftTask: UUID?
     @State private var dropping = false
-    private let rowStep: CGFloat = 34   // wysokość wiersza zadania + odstęp
+    @State private var smartBusy = false
+    @State private var lastSubmit = Date.distantPast   // Enter: nowe zadanie tylko raz (onSubmit albo nowa linia)
+    @State private var smartShown = false
+    @State private var smart: SmartProposal?
+    @State private var smartPick: Set<Int> = []
+    @State private var smartError: String?
+    private let rowGap: CGFloat = 8     // odstęp między wierszami zadań
 
     var body: some View {
         let note = store.binding(id)
@@ -109,7 +116,7 @@ struct EditorView: View {
                     }
                     ForEach(note.tasks) { $t in
                         let dragging = dragTask == t.id
-                        HStack(spacing: 9) {
+                        HStack(alignment: .top, spacing: 9) {
                             Image(systemName: "line.3.horizontal")
                                 .font(.system(size: 10, weight: .bold))
                                 .foregroundStyle(fg.opacity(dragging ? 0.9 : hoverTask == t.id ? 0.6 : 0.18))
@@ -119,25 +126,47 @@ struct EditorView: View {
                                 .gesture(reorder(t.id))
                                 .help(L("Przeciągnij, żeby zmienić kolejność"))
                             Button { t.done.toggle() } label: { CheckCircle(done: t.done, color: fg, size: 18) }
-                                .buttonStyle(.plain)
-                            TextField("", text: $t.text)
-                                .overlay(alignment: .leading) {
+                                .buttonStyle(.plain).padding(.top, 4)
+                            // w edytorze całe zadanie, zawinięte; na karteczce zostaje jedna linia
+                            TextField("", text: $t.text, axis: .vertical)
+                                .lineLimit(1...8)
+                                .overlay(alignment: .topLeading) {
                                     if t.text.isEmpty { Text(L("Zadanie")).font(.system(size: 14)).foregroundStyle(fg.opacity(0.3)).allowsHitTesting(false) }
                                 }
                                 .textFieldStyle(.plain)
                                 .font(.system(size: 14))
                                 .strikethrough(t.done, color: fg.opacity(0.5))
                                 .foregroundStyle(fg.opacity(t.done ? 0.5 : 1))
+                                .padding(.top, 4)
                                 .focused($focus, equals: t.id)
-                                .onSubmit { insertTask(after: t.id) }
+                                .onSubmit { lastSubmit = Date(); insertTask(after: t.id) }
+                                .onChange(of: t.text) { _, v in
+                                    // Enter (albo wklejony tekst z nową linią) robi nowe zadanie, nie drugi wiersz
+                                    guard v.contains("\n") else { return }
+                                    let parts = v.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+                                    t.text = parts[0]
+                                    var after = t.id
+                                    for p in parts.dropFirst() where !p.trimmingCharacters(in: .whitespaces).isEmpty {
+                                        after = insertTask(after: after, text: p)
+                                    }
+                                    if parts.dropFirst().allSatisfy({ $0.trimmingCharacters(in: .whitespaces).isEmpty }),
+                                       Date().timeIntervalSince(lastSubmit) > 0.3 {
+                                        lastSubmit = Date()
+                                        insertTask(after: t.id)
+                                    }
+                                }
                             Button { removeTask(t.id) } label: {
                                 Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(fg.opacity(0.5))
                                     .frame(width: 18, height: 18).contentShape(Rectangle())
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.plain).padding(.top, 4)
                             .opacity(hoverTask == t.id ? 1 : 0)
                         }
-                        .frame(height: 26)
+                        .frame(minHeight: 26)
+                        .background(GeometryReader { g in
+                            Color.clear.onAppear { rowH[t.id] = g.size.height }
+                                .onChange(of: g.size.height) { _, h in rowH[t.id] = h }
+                        })
                         .padding(.horizontal, 6).padding(.leading, -10)
                         .background(
                             RoundedRectangle(cornerRadius: 9, style: .continuous)
@@ -146,7 +175,7 @@ struct EditorView: View {
                                 .shadow(color: .black.opacity(liftTask == t.id ? 0.22 : 0), radius: 10, y: 6)
                         )
                         .scaleEffect(liftTask == t.id ? 1.04 : 1)
-                        .offset(y: dragging ? dragY - CGFloat(dragShift) * rowStep - (liftTask == t.id ? 3 : 0) : 0)
+                        .offset(y: dragging ? dragY - dragShift - (liftTask == t.id ? 3 : 0) : 0)
                         .zIndex(dragging || liftTask == t.id ? 10 : 0)
                         // wiersz w ręce idzie za myszą bez animacji, reszta rozstępuje się sprężyście
                         .transaction { if dragging && !$0[LiftKey.self] { $0.animation = nil } }
@@ -175,6 +204,21 @@ struct EditorView: View {
                         Text(L("Notatka")).font(.system(size: 11, weight: .bold)).tracking(0.8).textCase(.uppercase)
                             .foregroundStyle(fg.opacity(0.6))
                         Spacer()
+                        if !note.wrappedValue.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Button { runSmart(note.wrappedValue.body) } label: {
+                                HStack(spacing: 5) {
+                                    if smartBusy { ProgressView().controlSize(.mini) }
+                                    else { Image(systemName: "sparkles").font(.system(size: 10, weight: .bold)) }
+                                    Text(L("Zrób zadania")).font(.system(size: 12, weight: .medium))
+                                }
+                                .foregroundStyle(fg.opacity(0.6)).contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain).disabled(smartBusy)
+                            .help(ClaudeKey.isSet ? L("Claude zamieni notatkę na zadania. Najpierw zobaczysz propozycję.")
+                                                  : L("Podzieli notatkę na zadania po czasownikach. Z kluczem Claude (ustawienia) zrozumie też kontekst."))
+                            .popover(isPresented: $smartShown, arrowEdge: .bottom) { smartView(note) }
+                            .padding(.trailing, 10)
+                        }
                         Button { pickFiles(id) } label: {
                             HStack(spacing: 5) {
                                 Image(systemName: "paperclip").font(.system(size: 10, weight: .bold))
@@ -290,12 +334,17 @@ struct EditorView: View {
                 }
                 dragY = v.translation.height
                 guard let i = note.wrappedValue.tasks.firstIndex(where: { $0.id == tid }) else { return }
-                let off = dragY - CGFloat(dragShift) * rowStep
+                let off = dragY - dragShift
+                let tasks = note.wrappedValue.tasks
+                // sąsiad może mieć kilka linii, więc przeskok to jego wysokość, nie stały krok
+                func step(_ j: Int) -> CGFloat { (rowH[tasks[j].id] ?? 26) + rowGap }
                 withAnimation(.spring(response: 0.24, dampingFraction: 0.82)) {
-                    if off > rowStep / 2, i < note.wrappedValue.tasks.count - 1 {
-                        note.wrappedValue.tasks.swapAt(i, i + 1); dragShift += 1
-                    } else if off < -rowStep / 2, i > 0 {
-                        note.wrappedValue.tasks.swapAt(i, i - 1); dragShift -= 1
+                    if i < tasks.count - 1, off > step(i + 1) / 2 {
+                        let s = step(i + 1)
+                        note.wrappedValue.tasks.swapAt(i, i + 1); dragShift += s
+                    } else if i > 0, off < -step(i - 1) / 2 {
+                        let s = step(i - 1)
+                        note.wrappedValue.tasks.swapAt(i, i - 1); dragShift -= s
                     }
                 }
             }
@@ -305,15 +354,116 @@ struct EditorView: View {
             }
     }
 
-    private func insertTask(after tid: UUID?) {
+    // MARK: zadania z notatki
+
+    private func runSmart(_ text: String) {
+        smartBusy = true; smartError = nil
+        Smart.propose(text) { r in
+            smartBusy = false
+            switch r {
+            case .success(let p): smart = p; smartPick = Set(p.result.tasks.indices)
+            case .failure(let e): smart = nil; smartError = e.localizedDescription
+            }
+            smartShown = true
+        }
+    }
+
+    /// Propozycja: zadania do odhaczenia, klient, projekt i termin; notatka zostaje bez zmian.
+    @ViewBuilder private func smartView(_ note: Binding<Note>) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let err = smartError {
+                Text(err).font(.system(size: 12.5)).fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Spacer()
+                    Button(L("Podziel bez AI")) {
+                        let r = parseDictation(note.wrappedValue.body)
+                        smart = SmartProposal(result: r, viaAI: false); smartPick = Set(r.tasks.indices); smartError = nil
+                    }
+                }
+            } else if let p = smart {
+                HStack(spacing: 5) {
+                    Image(systemName: p.viaAI ? "sparkles" : "text.badge.checkmark").font(.system(size: 10, weight: .bold))
+                    Text(p.viaAI ? L("Propozycja od Claude") : L("Podział po czasownikach")).font(.system(size: 10.5, weight: .bold))
+                        .tracking(0.6).textCase(.uppercase)
+                }
+                .foregroundStyle(.secondary)
+                let meta = [p.result.client, p.result.project].filter { !$0.isEmpty }.joined(separator: " · ")
+                if !meta.isEmpty || p.result.deadline != nil || !p.result.tags.isEmpty {
+                    HStack(spacing: 6) {
+                        if !meta.isEmpty { Text(meta.uppercased()).font(.system(size: 10, weight: .bold)).tracking(0.6) }
+                        if let d = p.result.deadline {
+                            Label(dayLabel(d, time: p.result.hasTime), systemImage: "calendar").font(.system(size: 11, weight: .medium))
+                        }
+                        ForEach(p.result.tags, id: \.self) { t in Text("#" + t).font(.system(size: 11, weight: .medium)) }
+                    }
+                    .foregroundStyle(.secondary)
+                }
+                if p.result.tasks.isEmpty {
+                    Text(L("Nie znalazłem tu zadań.")).font(.system(size: 12.5)).foregroundStyle(.secondary)
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(p.result.tasks.enumerated()), id: \.offset) { i, t in
+                        Button {
+                            if smartPick.contains(i) { smartPick.remove(i) } else { smartPick.insert(i) }
+                        } label: {
+                            HStack(alignment: .top, spacing: 8) {
+                                Image(systemName: smartPick.contains(i) ? "checkmark.square.fill" : "square")
+                                    .font(.system(size: 13)).foregroundStyle(smartPick.contains(i) ? Color.accentColor : .secondary)
+                                Text(t).font(.system(size: 13)).fixedSize(horizontal: false, vertical: true)
+                                Spacer(minLength: 0)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                HStack {
+                    if !p.viaAI && !ClaudeKey.isSet {
+                        Text(L("Z kluczem Claude zrozumie też kontekst.")).font(.system(size: 10.5)).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button(L("Anuluj")) { smartShown = false }
+                    Button(LF("Dodaj (%d)", smartPick.count)) { applySmart(p, to: note); smartShown = false }
+                        .keyboardShortcut(.defaultAction).disabled(smartPick.isEmpty && p.result.client.isEmpty)
+                }
+            }
+        }
+        .padding(14)
+        .frame(width: 340)
+    }
+
+    private func dayLabel(_ d: Date, time: Bool) -> String {
+        let f = DateFormatter(); f.locale = Locale(identifier: Lang.current == "pl" ? "pl_PL" : "en_US")
+        f.setLocalizedDateFormatFromTemplate("dMMM")
+        return f.string(from: d) + (time ? " " + timeString(d) : "")
+    }
+
+    /// Wybrane zadania na koniec listy; klient, projekt, tagi, termin i tytuł tylko tam, gdzie pole jest puste.
+    private func applySmart(_ p: SmartProposal, to note: Binding<Note>) {
+        var n = note.wrappedValue
+        let r = p.result
+        n.tasks.removeAll { $0.text.trimmingCharacters(in: .whitespaces).isEmpty }
+        n.tasks += r.tasks.indices.filter { smartPick.contains($0) }.map { TaskItem(text: r.tasks[$0]) }
+        if n.title.isEmpty, !p.title.isEmpty { n.title = p.title }
+        if !r.client.isEmpty && n.client.isEmpty { n.client = r.client }
+        if !r.project.isEmpty && n.project.isEmpty { n.project = r.project }
+        for t in r.tags where !n.tags.contains(where: { $0.caseInsensitiveCompare(t) == .orderedSame }) { n.tags.append(t) }
+        if let d = r.deadline, n.deadline == nil { n.deadline = d; n.hasTime = r.hasTime }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { note.wrappedValue = n }
+        store.ensureTagColors()
+    }
+
+    @discardableResult
+    private func insertTask(after tid: UUID?, text: String = "") -> UUID {
         let note = store.binding(id)
-        let t = TaskItem()
+        var t = TaskItem(); t.text = text
         if let tid, let i = note.wrappedValue.tasks.firstIndex(where: { $0.id == tid }) {
             note.wrappedValue.tasks.insert(t, at: i + 1)
         } else {
             note.wrappedValue.tasks.append(t)
         }
         DispatchQueue.main.async { focus = t.id }
+        return t.id
     }
 
     private func removeTask(_ tid: UUID) {

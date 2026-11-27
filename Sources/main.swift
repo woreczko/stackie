@@ -34,6 +34,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     var snap: String? { ProcessInfo.processInfo.environment["STOSIK_SNAP"] }
 
     /// 0 na pulpicie (pod oknami), 1 zwykłe okno, 2 zawsze na wierzchu
+    /// Róg ekranu z szybką notatką: 0 wyłączony, 1 lewy górny, 2 prawy górny, 3 lewy dolny, 4 prawy dolny.
+    var hotCorner: Int {
+        get { defaults.integer(forKey: "hotCorner") }
+        set { defaults.set(newValue, forKey: "hotCorner") }
+    }
+    private var cornerSince: Date?
+    private var cornerFired = false
+
+    /// Kursor wjechał w wybrany róg i chwilę tam został: nowa karteczka. Następna dopiero po odjechaniu z rogu.
+    func checkHotCorner(_ m: NSPoint) {
+        guard hotCorner > 0, snap == nil,
+              // ekran, na którym naprawdę jest kursor (na styku dwóch monitorów nie bierzemy sąsiada)
+              let s = NSScreen.screens.first(where: { NSMouseInRect(m, $0.frame, false) })
+                ?? NSScreen.screens.first(where: { $0.frame.insetBy(dx: -1, dy: -1).contains(m) }) else { return }
+        let f = s.frame
+        let left = hotCorner == 1 || hotCorner == 3, top = hotCorner <= 2
+        let dx = abs(m.x - (left ? f.minX : f.maxX - 1)), dy = abs(m.y - (top ? f.maxY - 1 : f.minY))
+        if dx <= 3 && dy <= 3 {
+            if cornerSince == nil { cornerSince = Date() }
+            if !cornerFired, let t = cornerSince, Date().timeIntervalSince(t) > 0.25 {
+                cornerFired = true
+                stack?.orderFrontRegardless()
+                newNote(centered: true)
+            }
+        } else {
+            cornerSince = nil
+            if dx > 80 || dy > 80 { cornerFired = false }
+        }
+    }
+
     var levelMode: Int {
         get { defaults.object(forKey: "level") as? Int ?? 1 }
         set { defaults.set(newValue, forKey: "level"); applyLevel() }
@@ -70,11 +100,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
         Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             self?.store.objectWillChange.send(); self?.updateStatusTitle()
+            self?.resizeStack()   // o północy kartka „Na dziś” może się pojawić albo zniknąć
         }
-        if let snap { runSnapshots(snap) }
-        else if Updater.announceIfUpdated() {
-            // po cichej aktualizacji tylko powiadomienie, bez całego powitania
+        // budowanie: zaszyfruj klucz hasłem (zbuduj.sh), wynik na standardowe wyjście
+        if let kf = ProcessInfo.processInfo.environment["STOSIK_SEAL_KEY"], let pf = ProcessInfo.processInfo.environment["STOSIK_SEAL_PASS"] {
+            let k = (try? String(contentsOfFile: kf, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let pw = (try? String(contentsOfFile: pf, encoding: .utf8))?.trimmingCharacters(in: .newlines) ?? ""
+            if !k.isEmpty, !pw.isEmpty, let d = KeyBox.seal(k, password: pw), KeyBox.open(d, password: pw) == k {
+                FileHandle.standardOutput.write(d)
+                exit(0)
+            }
+            exit(1)
+        }
+        if let pw = ProcessInfo.processInfo.environment["STOSIK_OPEN_TEST"] {
+            // test hasła bez zapisywania czegokolwiek
+            let d = Bundle.main.url(forResource: "k", withExtension: "bin").flatMap { try? Data(contentsOf: $0) }
+            print("OPEN", d.flatMap { KeyBox.open($0, password: pw) }.map { "ok …" + $0.suffix(4) } ?? "fail")
+            exit(0)
+        }
+        // test zapytania do Claude (wypisuje wynik i kończy)
+        if let t = ProcessInfo.processInfo.environment["STOSIK_SMART_TEST"] {
+            Smart.propose(t) { r in
+                switch r {
+                case .success(let p): print("SMART ok ai=\(p.viaAI) title=\(p.title) client=\(p.result.client) tasks=\(p.result.tasks) due=\(String(describing: p.result.deadline))")
+                case .failure(let e): print("SMART fail", e.localizedDescription)
+                }
+                NSApp.terminate(nil)
+            }
+        } else if let snap { runSnapshots(snap) }
+        else if let from = Updater.updatedFrom() {
+            // po aktualizacji: tylko nowe funkcje z pokazami (albo samo powiadomienie, gdy nic nowego do pokazania)
             UserDefaults.standard.set(APP_VERSION, forKey: "welcomeSeen")
+            if WelcomeView.hasNew(since: from) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { self.showWelcome(newSince: from) }
+            } else {
+                Updater.announceUpdate()
+            }
         } else if UserDefaults.standard.string(forKey: "welcomeSeen") != APP_VERSION {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { self.showWelcome() }
         }
@@ -89,9 +150,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     // MARK: stos
 
     func buildStack() {
-        let n = store.active.count
+        let n = ui.slots(store.active)
         StackLayout.fit(count: n, screenWidth: NSScreen.main?.visibleFrame.width ?? 1600)
-        let size = NSSize(width: StackLayout.width(n), height: StackLayout.height)
+        let k = StackLayout.scale
+        let size = NSSize(width: StackLayout.width(n) * k, height: StackLayout.height * k)
         var origin = NSPoint(x: 80, y: 120)
         if let s = defaults.string(forKey: "stackTopLeft") {
             let p = NSPointFromString(s); origin = NSPoint(x: p.x, y: p.y - size.height)
@@ -106,7 +168,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         stack.hidesOnDeactivate = false
         stack.isMovableByWindowBackground = false
         stack.delegate = self
-        let root = StackView(openEditor: { [weak self] id in self?.toggleEditor(id) },
+        let root = StackRoot(openEditor: { [weak self] id in self?.toggleEditor(id) },
                              newNote: { [weak self] in self?.newNote() },
                              openCalendar: { [weak self] in self?.toggleCalendar() })
             .environmentObject(store).environmentObject(ui)
@@ -136,11 +198,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     func resizeStack(force: Bool = false) {
         guard let stack else { return }
         let f = stack.frame
-        let count = max(1, ui.visible(store.active).count)
+        let count = max(1, ui.slots(ui.visible(store.active)))
         StackLayout.fit(count: count, screenWidth: (stack.screen ?? NSScreen.main)?.visibleFrame.width ?? 1600)
-        let w = max(StackLayout.width(count), 420)
-        guard force || abs(f.width - w) > 0.5 || abs(f.height - StackLayout.height) > 0.5 else { return }
-        stack.setFrame(NSRect(x: f.minX, y: f.maxY - StackLayout.height, width: w, height: StackLayout.height), display: true)
+        let k = StackLayout.scale
+        let w = max(StackLayout.width(count), 420) * k, h = StackLayout.height * k
+        guard force || abs(f.width - w) > 0.5 || abs(f.height - h) > 0.5 else { return }
+        stack.setFrame(NSRect(x: f.minX, y: f.maxY - h, width: w, height: h), display: true)
     }
 
     func windowDidChangeScreen(_ n: Notification) {
@@ -154,6 +217,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 
     func pollMouse() {
+        checkHotCorner(NSEvent.mouseLocation)
         guard let stack, stack.isVisible, snap == nil else { return }
         let m = NSEvent.mouseLocation
         let f = stack.frame
@@ -164,7 +228,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         if f.contains(m) {
             let top = NSWindow.windowNumber(at: m, belowWindowWithWindowNumber: 0)
             if top == stack.windowNumber {
-                p = CGPoint(x: m.x - f.minX, y: f.maxY - m.y)
+                p = CGPoint(x: (m.x - f.minX) / StackLayout.scale, y: (f.maxY - m.y) / StackLayout.scale)
             }
         }
         ui.mouse(at: p, notes: ui.visible(store.active))
@@ -172,16 +236,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     // MARK: edytor
 
-    func newNote() {
+    /// `centered`: karteczka na środku ekranu (z rogu ekranu), inaczej przy kursorze.
+    func newNote(centered: Bool = false) {
         let id = store.add()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { self.openEditor(id) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { self.openEditor(id, centered: centered) }
     }
 
     func toggleEditor(_ id: UUID) {
         if editorID == id, editor?.isVisible == true { closeEditor() } else { openEditor(id) }
     }
 
-    func openEditor(_ id: UUID, at point: NSPoint? = nil) {
+    func openEditor(_ id: UUID, at point: NSPoint? = nil, centered: Bool = false) {
         let size = NSSize(width: 400, height: 640)
         if editor == nil {
             let p = Panel(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless],
@@ -201,9 +266,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         host.sizingOptions = []
         editor.contentView = host
         let m = point ?? NSEvent.mouseLocation
-        let scr = (NSScreen.screens.first { $0.frame.contains(m) } ?? NSScreen.main)?.visibleFrame ?? .zero
+        let scr = (NSScreen.screens.first { $0.frame.insetBy(dx: -1, dy: -1).contains(m) } ?? NSScreen.main)?.visibleFrame ?? .zero
         var o = NSPoint(x: m.x + 30, y: m.y - size.height / 2)
         if o.x + size.width > scr.maxX - 10 { o.x = m.x - size.width - 30 }
+        if centered { o = NSPoint(x: scr.midX - size.width / 2, y: scr.midY - size.height / 2) }
         o.x = max(scr.minX + 10, min(o.x, scr.maxX - size.width - 10))
         o.y = max(scr.minY + 10, min(o.y, scr.maxY - size.height - 10))
         editor.setFrame(NSRect(origin: o, size: size), display: true)
@@ -235,7 +301,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         calendar.level = levelMode == 0 ? .normal : .floating
         let scr = (stack.screen ?? NSScreen.main)?.visibleFrame ?? .zero
         let f = stack.frame
-        var o = NSPoint(x: f.minX + StackLayout.padX, y: f.minY - size.height + StackLayout.padTop + 20)
+        let k = StackLayout.scale
+        var o = NSPoint(x: f.minX + StackLayout.padX * k, y: f.minY - size.height + (StackLayout.padTop + 20) * k)
         if o.y < scr.minY + 10 { o.y = f.maxY - 20 }
         o.x = max(scr.minX + 10, min(o.x, scr.maxX - size.width - 10))
         o.y = max(scr.minY + 10, min(o.y, scr.maxY - size.height - 10))
@@ -263,7 +330,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         // nad stosem albo pod otwartą karteczką
         var o: NSPoint
         if id != nil, let e = editor, e.isVisible { o = NSPoint(x: e.frame.midX - size.width / 2, y: e.frame.minY - size.height - 10) }
-        else { o = NSPoint(x: stack.frame.minX + StackLayout.padX, y: stack.frame.maxY - StackLayout.padTop - StackLayout.cardH - StackLayout.toolbarH - 30 - size.height) }
+        else { o = NSPoint(x: stack.frame.minX + StackLayout.padX * StackLayout.scale,
+                           y: stack.frame.maxY - (StackLayout.padTop + StackLayout.cardH + StackLayout.toolbarH + 30) * StackLayout.scale - size.height) }
         let scr = (stack.screen ?? NSScreen.main)?.visibleFrame ?? .zero
         o.x = max(scr.minX + 10, min(o.x, scr.maxX - size.width - 10))
         o.y = max(scr.minY + 10, min(o.y, scr.maxY - size.height - 10))
@@ -314,13 +382,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                 self.store.ensureTagColors()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                     let f = self.stack.frame
-                    self.openEditor(nid, at: NSPoint(x: f.minX + StackLayout.padX + StackLayout.cardW, y: f.maxY - 200))
+                    self.openEditor(nid, at: NSPoint(x: f.minX + (StackLayout.padX + StackLayout.cardW) * StackLayout.scale, y: f.maxY - 200))
                 }
             }
         }
     }
 
-    func showWelcome(startPage: Int = 0) {
+    func showWelcome(startPage: Int = 0, newSince: String? = nil) {
         let size = NSSize(width: 560, height: 470)
         let p = welcomeWin ?? Panel(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless], backing: .buffered, defer: false)
         p.isOpaque = false; p.backgroundColor = .clear; p.hasShadow = true
@@ -332,7 +400,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             UserDefaults.standard.set(APP_VERSION, forKey: "welcomeSeen")
             self?.welcomeWin?.orderOut(nil)
             self?.welcomeWin?.contentView = nil   // animacje (TimelineView) przestają liczyć w tle
-        }, startPage: startPage))
+        }, startPage: startPage, newSince: newSince))
         host.sizingOptions = []
         p.contentView = host
         let scr = (stack?.screen ?? NSScreen.main)?.visibleFrame ?? .zero
@@ -360,7 +428,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         w.level = levelMode == 0 ? .normal : .floating
         let f = stack.frame
         let scr = (stack.screen ?? NSScreen.main)?.visibleFrame ?? .zero
-        var o = NSPoint(x: f.minX + StackLayout.padX, y: f.maxY - StackLayout.padTop - StackLayout.cardH - size.height - 50)
+        let k = StackLayout.scale
+        var o = NSPoint(x: f.minX + StackLayout.padX * k, y: f.maxY - (StackLayout.padTop + StackLayout.cardH + 50) * k - size.height)
         o.x = max(scr.minX + 10, min(o.x, scr.maxX - size.width - 10))
         o.y = max(scr.minY + 10, min(o.y, scr.maxY - size.height - 10))
         w.setFrame(NSRect(origin: o, size: size), display: true)
@@ -483,6 +552,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             lsub.addItem(it)
         }
         langItem.submenu = lsub; menu.addItem(langItem)
+        let mini = item(L("Małe karteczki"), #selector(menuMini), "", "rectangle.compress.vertical")
+        mini.state = StackLayout.mini ? .on : .off
+        menu.addItem(mini)
         let login = item(L("Otwieraj przy logowaniu"), #selector(menuLogin), "", "power")
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
         menu.addItem(login)
@@ -511,6 +583,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     @objc func menuTrash() { toggleTrash() }
     @objc func menuWelcome() { showWelcome() }
     @objc func menuAutoUpdate() { Updater.shared.enabled.toggle() }
+    /// Małe karteczki (np. na 13–14 cali): tylko tytuł, data i licznik; pełna treść w edytorze.
+    @objc func menuMini() { setMini(!StackLayout.mini) }
+    func setMini(_ on: Bool) {
+        StackLayout.mini = on
+        UserDefaults.standard.set(on, forKey: "miniCards")
+        resizeStack(force: true)
+        ui.objectWillChange.send(); store.objectWillChange.send()
+    }
+    /// Rozmiar stosu: lewy górny róg zostaje na miejscu, okno i jego zawartość zmieniają skalę.
+    func setStackScale(_ k: CGFloat) {
+        StackLayout.fullScale = k
+        UserDefaults.standard.set(Double(k), forKey: "stackScale")
+        resizeStack(force: true)
+        // skala nie jest obserwowana przez SwiftUI: stos przerysowuje się od razu, nie dopiero po ruchu myszy
+        ui.objectWillChange.send(); store.objectWillChange.send()
+    }
     @objc func menuCalendar() { stack.orderFrontRegardless(); toggleCalendar() }
     @objc func menuLang(_ s: NSMenuItem) {
         guard let code = s.representedObject as? String else { return }
@@ -522,7 +610,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     func relocalize() {
         let editingID = editor?.isVisible == true ? editorID : nil
         let calOpen = calendar?.isVisible == true
-        let root = StackView(openEditor: { [weak self] id in self?.toggleEditor(id) },
+        let root = StackRoot(openEditor: { [weak self] id in self?.toggleEditor(id) },
                              newNote: { [weak self] in self?.newNote() },
                              openCalendar: { [weak self] in self?.toggleCalendar() })
             .environmentObject(store).environmentObject(ui)
@@ -580,6 +668,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             v.cacheDisplay(in: v.bounds, to: r)
             try? r.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: "\(dir)/\(name).png"))
         }
+        // kilka karteczek z terminem na dziś: pierwsza w stosie jest wtedy kartka „Na dziś”
+        for i in store.notes.indices where [1, 3, 4, 5, 6].contains(i) {
+            store.notes[i].deadline = Calendar.current.date(bySettingHour: 17, minute: 0, second: 0, of: Date())
+        }
+        // jeden klient z dwoma projektami: pod nazwą klienta linijka z projektami
+        if store.notes.count > 5 { store.notes[5].client = "Kawiarnia Róża"; store.notes[5].project = L("Ulotki") }
+        resizeStack(force: true)
         let s = store.active
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             shot(self.stack, "1_stos")
@@ -662,7 +757,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             if let w = self.trashWin { shot(w, "11_kosz") }
             self.trashWin?.orderOut(nil)
         }
-        for (k, pg) in [(8.0, 0), (8.4, 1), (8.8, 2), (9.0, 3), (9.2, 4), (9.4, 5), (9.6, 6), (10.0, 7), (10.4, 8), (10.8, 9)] {
+        // po aktualizacji z 1.2: same nowości
+        for (k, pg) in [(7.8, 0), (7.85, 1), (7.9, 2), (7.95, 3)] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + k) {
+                let w = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 560, height: 470), styleMask: [.borderless], backing: .buffered, defer: false)
+                w.appearance = NSAppearance(named: .aqua)
+                w.contentView = NSHostingView(rootView: WelcomeView(close: {}, startPage: pg, newSince: "1.2"))
+                w.orderFront(nil)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { shot(w, "18_nowosci_\(pg)"); w.orderOut(nil) }
+            }
+        }
+        for (k, pg) in [(8.0, 0), (8.4, 1), (8.8, 2), (9.0, 3), (9.2, 4), (9.4, 5), (9.6, 6), (10.0, 7), (10.4, 8), (10.8, 9), (10.9, 10), (10.95, 11), (11.0, 12), (11.05, 13)] {
             DispatchQueue.main.asyncAfter(deadline: .now() + k) {
                 let w = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 560, height: 470), styleMask: [.borderless], backing: .buffered, defer: false)
                 w.appearance = NSAppearance(named: .aqua)
@@ -671,7 +776,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { shot(w, "14_witaj_\(pg)"); w.orderOut(nil) }
             }
         }
-        for k in [(11.0, (5, 0.25)), (11.3, (5, 0.5)), (11.6, (5, 0.75)), (11.9, (6, 0.45)), (12.2, (6, 0.8))].enumerated() {
+        for k in [(11.0, (5, 0.25)), (11.3, (5, 0.5)), (11.6, (5, 0.75)), (11.9, (6, 0.45)), (12.2, (6, 0.8)), (12.3, (8, 0.5)), (12.35, (9, 0.3)), (12.4, (9, 0.78)), (12.5, (11, 0.35)), (12.6, (11, 0.85))].enumerated() {
             DispatchQueue.main.asyncAfter(deadline: .now() + k.element.0) {
                                 let (pg, ph) = k.element.1
                 FROZEN_PHASE = ph
@@ -686,7 +791,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             // karteczka z plikami (zdjęcie i tekst z projektu)
             let id = self.store.add()
             if let i = self.store.notes.firstIndex(where: { $0.id == id }) {
-                self.store.notes[i].title = L("Pomysły na weekend"); self.store.notes[i].tasks = []
+                self.store.notes[i].title = L("Pomysły na weekend")
+                self.store.notes[i].tasks = ["Jedna kartka podsumowująca, co każdego dnia trzeba zrobić i dla kogo", "Mini wersja na pulpit"].map { var t = TaskItem(); t.text = $0; return t }
                 self.store.notes[i].body = ""
                 self.store.notes[i].deadline = Calendar.current.date(bySettingHour: 14, minute: 30, second: 0, of: Date())
                 self.store.notes[i].hasTime = true
@@ -700,7 +806,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             w.orderFront(nil)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { shot(w, "16_pliki"); w.orderOut(nil) }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 13.3) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 12.8) {
+            // „Na dziś” przesunięta na trzecie miejsce (po zrzucie: z powrotem, to ustawienie użytkownika)
+            self.ui.setTodayPos(2); self.ui.spread = true; self.ui.hovered = nil
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                shot(self.stack, "17_na_dzis_przesunieta")
+                UserDefaults.standard.removeObject(forKey: "todayPos"); UserDefaults.standard.removeObject(forKey: "todayPosDay")
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 13.6) {
             NSApp.terminate(nil)
         }
     }

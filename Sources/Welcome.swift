@@ -5,23 +5,34 @@ import UserNotifications
 
 // MARK: - Okienko powitalne: strony z animacjami możliwości i historia zmian
 
-let APP_VERSION = "1.2"
+let APP_VERSION = "1.3"
 
-struct WelcomePage { let title: String; let text: String; let demo: AnyView }
+/// `since`: wersja, w której funkcja się pojawiła (po aktualizacji pokazujemy tylko nowsze strony).
+struct WelcomePage { let title: String; let text: String; let demo: AnyView; var since = "1.0" }
 
 struct WelcomeView: View {
     var close: () -> Void
     @State private var page: Int
+    /// Po aktualizacji: tylko strony z funkcjami nowszymi niż ta wersja, bez zgód i historii zmian.
+    var newSince: String?
 
     /// Strona „Co nowego” (po stronach z pokazami i zgodach).
     static var changelogPage: Int { WelcomeView(close: {}).pages.count + 1 }
+    /// Czy po aktualizacji z tej wersji jest co pokazać.
+    static func hasNew(since v: String) -> Bool { !WelcomeView(close: {}, newSince: v).pages.isEmpty }
 
-    init(close: @escaping () -> Void, startPage: Int = 0) {
+    init(close: @escaping () -> Void, startPage: Int = 0, newSince: String? = nil) {
         self.close = close
+        self.newSince = newSince
         _page = State(initialValue: startPage)
     }
 
     var pages: [WelcomePage] {
+        guard let v = newSince else { return allPages }
+        return allPages.filter { Updater.newer($0.since, than: v) }
+    }
+
+    private var allPages: [WelcomePage] {
         [
             WelcomePage(title: L("Witaj w Stosiku"), text: L("Karteczki leżą na pulpicie jak talia kart. Najedź myszką, a stos się rozłoży."), demo: AnyView(DemoStack())),
             WelcomePage(title: L("Projekty i zadania"), text: L("Jedna karteczka to jeden projekt. Odhaczasz kółeczka, a pasek pokazuje postęp. Zadania przesuwasz za uchwyt."), demo: AnyView(DemoTasks())),
@@ -31,11 +42,15 @@ struct WelcomeView: View {
             WelcomePage(title: L("Pliki przy karteczce"), text: L("Przeciągnij PDF, zdjęcie albo inny plik na otwartą karteczkę. Stosik trzyma kopię, więc nic nie zginie."), demo: AnyView(DemoFiles())),
             WelcomePage(title: L("Kosz na 30 dni"), text: L("Pociągnij karteczkę w dół, aż kosz zrobi się czerwony. Przez 30 dni możesz ją przywrócić."), demo: AnyView(DemoTrash())),
             WelcomePage(title: L("Dyktowanie"), text: L("Kliknij mikrofon i powiedz, co jest do zrobienia. Każdy czasownik zaczyna nowe zadanie, a „klient”, „projekt” i „tag” wypełniają pola."), demo: AnyView(DemoDictation())),
+            WelcomePage(title: L("Na dziś"), text: L("Biała kartka na początku stosu zbiera wszystko z terminem na dziś, po klientach. Możesz ją przesunąć, rano wraca na pierwsze miejsce."), demo: AnyView(DemoToday()), since: "1.3"),
+            WelcomePage(title: L("Zadania z notatki"), text: L("Piszesz szybko i bez ładu, np. przy telefonie. Kliknij ✨ „Zrób zadania”, a Claude ułoży z tego listę zadań z klientem i terminem. Najpierw zobaczysz propozycję."), demo: AnyView(DemoSmart()), since: "1.3"),
+            WelcomePage(title: L("Szybka karteczka z rogu"), text: L("Wjedź kursorem w wybrany róg ekranu, a wyskoczy nowa karteczka. Róg wybierasz w ustawieniach pod kółkiem zębatym."), demo: AnyView(DemoCorner()), since: "1.3"),
+            WelcomePage(title: L("Rozmiar stosu"), text: L("Mały ekran? W ustawieniach pod kółkiem zębatym zmniejszysz stos albo przełączysz się na małe karteczki: sam tytuł, data i licznik."), demo: AnyView(DemoSizes()), since: "1.3"),
         ]
     }
 
     var body: some View {
-        let all = pages.count + 2
+        let all = newSince == nil ? pages.count + 2 : pages.count
         VStack(spacing: 0) {
             ZStack {
                 if page < pages.count {
@@ -106,6 +121,15 @@ struct WelcomeView: View {
 struct Release { let version: String; let date: String; let items: [String] }
 
 var RELEASES: [Release] {[
+    Release(version: "1.3", date: "27.11.2026", items: [
+        L("Kartka „Na dziś”: wszystko z terminem na dziś, po klientach i projektach; wraca rano na początek stosu"),
+        L("Rozmiar stosu: duży, średni albo mały, i małe karteczki (tytuł, data, licznik)"),
+        L("Długie zadania zawijają się w edytorze"),
+        L("„Zrób zadania”: Claude zamienia chaotyczną notatkę na zadania z klientem i terminem"),
+        L("Nowa karteczka z rogu ekranu (do wyboru w ustawieniach)"),
+        L("Złożony stos pokazuje tylko trzy karty: Na dziś, karteczkę i kalendarz"),
+        L("Ustawienia jako pastylki"),
+    ]),
     Release(version: "1.2", date: "27.11.2026", items: [
         L("Samoczynne aktualizacje: raz dziennie Stackie sprawdza nową wersję i instaluje ją, gdy nie używasz komputera"),
         L("Wyłącznik w menu w pasku: Ustawienia → Aktualizuj automatycznie"),
@@ -190,7 +214,7 @@ struct DemoCard: View {
     var body: some View {
         CardView(note: .constant(note))
             .scaleEffect(scale, anchor: .topLeading)
-            .frame(width: StackLayout.cardW * scale, height: StackLayout.cardH * scale, alignment: .topLeading)
+            .frame(width: StackLayout.fullW * scale, height: StackLayout.fullH * scale, alignment: .topLeading)
             .allowsHitTesting(false)
     }
 }
@@ -226,7 +250,7 @@ struct MiniCalendarCard: View {
     }
 }
 
-private let DEMO_NOTES: [Note] = [
+let DEMO_NOTES: [Note] = [
     demoNote(2, L("Prezentacja dla klienta"), [L("Poprawić slajdy"), L("Dorobić obrazki"), L("Wysłać do klienta")], done: 1,
              client: "Studio Nova", project: "Branding", tags: ["design"], priority: 3, due: 1, alerts: [1440]),
     demoNote(1, L("Pomysły na weekend"), [L("Rower"), L("Kino")], tags: [L("pomysły")], priority: 1),
@@ -556,5 +580,149 @@ struct Permissions: View {
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 12).fill(Color.ink.opacity(0.04)))
         .padding(.bottom, 8)
+    }
+}
+
+
+// MARK: - Pokazy z 1.3
+
+/// Kartka „Na dziś”: klienci dopisują się po kolei, potem jedno zadanie zostaje odhaczone.
+struct DemoToday: View {
+    var body: some View {
+        Loop(period: 5.0) { t in
+            let n = t < 0.18 ? 0 : t < 0.32 ? 1 : t < 0.46 ? 2 : 3
+            let done = t > 0.66 ? 1 : 0
+            let groups = Array([
+                TodayGroup(key: "c:a", name: "Studio Nova", client: "Studio Nova", project: "", open: 3 - done, total: 3,
+                           notes: [UUID(), UUID()], projects: [(L("Logo"), 2 - done), (L("Ulotki"), 1)]),
+                TodayGroup(key: "c:b", name: "Kawiarnia Róża", client: "Kawiarnia Róża", project: "", open: 2, total: 2, notes: [UUID()]),
+                TodayGroup(key: "t:c", name: L("Zakupy"), client: "", project: "", open: 2, total: 3, notes: [UUID()]),
+            ].prefix(n))
+            ZStack {
+                ForEach(0..<2) { i in
+                    DemoCard(note: DEMO_NOTES[i + 1], scale: 0.62)
+                        .rotationEffect(.degrees(i == 0 ? 3.6 : -2))
+                        .offset(x: 40 + CGFloat(i) * 26, y: -6 - CGFloat(i) * 4)
+                }
+                TodayCard(groups: groups)
+                    .scaleEffect(0.78)
+                    .frame(width: StackLayout.fullW * 0.78, height: StackLayout.fullH * 0.78)
+                    .rotationEffect(.degrees(-2.5))
+                    .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+                    .offset(x: -40)
+            }
+            .opacity(1 - ease(t, 0.92, 1.0))
+        }
+    }
+}
+
+/// Ten sam stos w trzech rozmiarach, a na koniec małe karteczki; pod spodem pastylka z nazwą.
+struct DemoSizes: View {
+    var body: some View {
+        Loop(period: 6.0) { t in
+            let step = min(Int(t * 4), 3)
+            let scales: [CGFloat] = [1, 0.85, 0.7, 1]
+            let names = [L("Duży"), L("Średni"), L("Mały"), L("Małe karteczki")]
+            let k = step == 3 ? 0.85 : scales[step] * 0.62
+            VStack(spacing: 14) {
+                ZStack(alignment: .topLeading) {
+                    ForEach((0..<3).reversed(), id: \.self) { i in
+                        Group {
+                            if step == 3 { CardView(note: .constant(DEMO_NOTES[i]), mini: true) }
+                            else { CardView(note: .constant(DEMO_NOTES[i])) }
+                        }
+                        .rotationEffect(.degrees(i % 2 == 0 ? -3 : 3.5))
+                        .offset(x: CGFloat(i) * 26, y: -CGFloat(i) * 4)
+                    }
+                }
+                .scaleEffect(k, anchor: .bottom)
+                .frame(width: 320, height: 190, alignment: .bottom)
+                .animation(.spring(response: 0.45, dampingFraction: 0.8), value: step)
+                HStack(spacing: 6) {
+                    ForEach(0..<4) { i in
+                        Text(names[i]).font(.system(size: 11, weight: i == step ? .semibold : .medium))
+                            .foregroundStyle(i == step ? Color.ink : .white.opacity(0.7))
+                            .padding(.horizontal, 10).padding(.vertical, 4)
+                            .background(Capsule().fill(i == step ? Color.white : .white.opacity(0.12)))
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+/// Kursor jedzie w lewy dolny róg ekranu, róg się podświetla i wyskakuje pusta karteczka.
+struct DemoCorner: View {
+    var body: some View {
+        Loop(period: 4.2) { t in
+            let go = ease(t, 0.05, 0.4), pop = ease(t, 0.5, 0.68), out = ease(t, 0.9, 1.0)
+            ZStack {
+                // ekran
+                RoundedRectangle(cornerRadius: 10).strokeBorder(.white.opacity(0.25), lineWidth: 1.5)
+                    .frame(width: 360, height: 210)
+                // podświetlony róg
+                Circle().fill(Color(hex: 0x9BE08F).opacity(0.55 * ease(t, 0.38, 0.45) * (1 - pop * 0.6)))
+                    .frame(width: 46, height: 46).blur(radius: 8)
+                    .offset(x: -180, y: 105)
+                DemoCard(note: demoNote(2, L("Nowa karteczka"), []), scale: 0.5)
+                    .scaleEffect(0.6 + 0.4 * pop).opacity(pop)
+                    .shadow(color: .black.opacity(0.35), radius: 10, y: 5)
+                    .offset(x: -40, y: 10 - 14 * pop)
+                Image(systemName: "cursorarrow").font(.system(size: 20)).foregroundStyle(.white).shadow(radius: 2)
+                    .offset(x: 80 - 254 * go, y: -30 + 132 * go)
+            }
+            .opacity(1 - out)
+        }
+    }
+}
+
+
+/// Chaotyczna notatka pisze się sama, ✨ „Zrób zadania” błyska, a obok wyrasta karteczka z zadaniami.
+struct DemoSmart: View {
+    var body: some View {
+        Loop(period: 7.0) { t in
+            let full = L("Beata dzwoniła, reklama do ELLE na piątek!! logo od Kampa, faktura Figure… drukarnia jutro rano")
+            let typed = String(full.prefix(Int(Double(full.count) * ease(t, 0.04, 0.34))))
+            let press = ease(t, 0.38, 0.42) * (1 - ease(t, 0.44, 0.5))
+            let card = ease(t, 0.5, 0.6)
+            let tasks = [L("Dokończyć reklamę do piątku"), L("Ogarnąć logo od Kampa"), L("Wysłać fakturę do Figure"), L("Zadzwonić do drukarni")]
+            let n = t < 0.6 ? 0 : min(tasks.count, Int((t - 0.6) / 0.05) + 1)
+            HStack(spacing: 26) {
+                // notatka pisana na szybko
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(L("Notatka")).font(.system(size: 9, weight: .bold)).tracking(0.7).textCase(.uppercase)
+                            .foregroundStyle(Color.ink.opacity(0.55))
+                        Spacer()
+                        HStack(spacing: 4) {
+                            Image(systemName: "sparkles").font(.system(size: 8.5, weight: .bold))
+                            Text(L("Zrób zadania")).font(.system(size: 10, weight: .semibold))
+                        }
+                        .foregroundStyle(Color.ink.opacity(0.6 + 0.4 * press))
+                        .padding(.horizontal, 7).padding(.vertical, 3)
+                        .background(Capsule().fill(Color(hex: 0x8B7CF6).opacity(0.15 + 0.5 * press)))
+                        .scaleEffect(1 + 0.12 * press)
+                        .shadow(color: Color(hex: 0x8B7CF6).opacity(0.8 * press), radius: 8)
+                    }
+                    Text(typed).font(.system(size: 12.5, design: .rounded)).foregroundStyle(Color.ink.opacity(0.85))
+                        .frame(width: 180, height: 110, alignment: .topLeading)
+                }
+                .padding(12)
+                .frame(width: 210)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: 0xF7F1E7)))
+                .rotationEffect(.degrees(-2))
+                // karteczka z zadaniami
+                DemoCard(note: demoNote(3, L("Reklama ELLE"), Array(tasks.prefix(n)), client: "ELLE", due: 7), scale: 0.78)
+                    .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+                    .rotationEffect(.degrees(2.5))
+                    .opacity(card).scaleEffect(0.85 + 0.15 * card)
+                    .overlay(alignment: .topLeading) {
+                        Image(systemName: "sparkles").font(.system(size: 18, weight: .bold)).foregroundStyle(Color(hex: 0xC9BEFF))
+                            .opacity(card * (1 - ease(t, 0.75, 0.85))).offset(x: -10, y: -10)
+                    }
+            }
+            .opacity(1 - ease(t, 0.93, 1.0))
+        }
     }
 }

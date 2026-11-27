@@ -145,18 +145,22 @@ final class Updater {
 
     // MARK: po aktualizacji
 
-    /// Wywoływane przy starcie: jeśli to nowa wersja po aktualizacji, krótkie powiadomienie.
-    static func announceIfUpdated() -> Bool {
+    /// Wywoływane przy starcie: z jakiej wersji przyszła aktualizacja (nil, gdy to nie aktualizacja).
+    static func updatedFrom() -> String? {
         let d = UserDefaults.standard
         let last = d.string(forKey: "lastRunVersion")
         d.set(APP_VERSION, forKey: "lastRunVersion")
-        guard let last, newer(APP_VERSION, than: last) else { return false }
+        guard let last, newer(APP_VERSION, than: last) else { return nil }
+        return last
+    }
+
+    /// Krótkie powiadomienie o aktualizacji (gdy nie ma nowych funkcji do pokazania).
+    static func announceUpdate() {
         let c = UNMutableNotificationContent()
         c.title = LF("Zaktualizowano do %@", APP_VERSION)
         c.body = L("Kliknij, żeby zobaczyć, co nowego.")
         c.userInfo = ["whatsNew": true]
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "update-\(APP_VERSION)", content: c, trigger: nil))
-        return true
     }
 
     // MARK: pomocnicze

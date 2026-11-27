@@ -81,15 +81,51 @@ struct CalendarCard: View {
     @EnvironmentObject var store: Store
     var month: Date
     var lifted = false
+    var mini = false
     @AppStorage("calMode") private var modeRaw = CalMode.project.rawValue
 
     var body: some View {
+        if mini { miniCard } else { fullCard }
+    }
+
+    /// Mała wersja: miesiąc i dwa liczniki, bez siatki dni.
+    private var miniCard: some View {
+        let (name, year) = monthTitle(month)
+        let closed = store.closed(in: month).count
+        let ahead = store.due(in: month).filter { !$0.allDone }.count
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(name).font(.system(size: 14, weight: .semibold)).tracking(-0.3).lineLimit(1)
+                Spacer(minLength: 2)
+                Text("'\(String(format: "%02d", year % 100))").font(.system(size: 9, weight: .semibold)).opacity(0.5)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "calendar").font(.system(size: 22, weight: .light)).opacity(0.35)
+                .frame(maxWidth: .infinity)
+            Spacer(minLength: 0)
+            HStack(spacing: 10) {
+                Label("\(closed)", systemImage: "checkmark").help(L("Zamknięte w tym miesiącu"))
+                Label("\(ahead)", systemImage: "arrow.right").help(L("Przed nami w tym miesiącu"))
+            }
+            .font(.system(size: 11, weight: .semibold))
+            .labelStyle(TightLabel())
+        }
+        .foregroundStyle(Color.ink)
+        .padding(EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12))
+        .frame(width: 150, height: 116, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 11, style: .continuous).fill(CAL_GREY)
+                .shadow(color: .black.opacity(lifted ? 0.3 : 0.18), radius: lifted ? 14 : 6, y: lifted ? 8 : 3)
+        )
+    }
+
+    private var fullCard: some View {
         let mode = CalMode(rawValue: modeRaw) ?? .project
         let (name, year) = monthTitle(month)
         let grid = monthGrid(month)
         let closed = store.closed(in: month).count
         let ahead = store.due(in: month).filter { !$0.allDone }.count
-        VStack(alignment: .leading, spacing: 0) {
+        return VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
                 Text(name).font(.system(size: 19, weight: .semibold)).tracking(-0.5)
                 Spacer()
@@ -114,7 +150,7 @@ struct CalendarCard: View {
         }
         .foregroundStyle(Color.ink)
         .padding(EdgeInsets(top: 14, leading: 16, bottom: 15, trailing: 16))
-        .frame(width: StackLayout.calW, height: StackLayout.calH, alignment: .topLeading)
+        .frame(width: StackLayout.fullW, height: StackLayout.fullH, alignment: .topLeading)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous).fill(CAL_GREY)
                 .shadow(color: .black.opacity(lifted ? 0.3 : 0.18), radius: lifted ? 16 : 7, y: lifted ? 10 : 3)

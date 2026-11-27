@@ -55,3 +55,9 @@ Karteczki na ekranie Maca ułożone w stos (wersja 1.0, 27.11.2026). Po angielsk
 - `./publikuj.sh` buduje apkę dla Apple Silicon i Intela, podpisuje certyfikatem „Developer ID Application” (hardened runtime, uprawnienia w Stosik.entitlements), wysyła do notaryzacji Apple, dokleja potwierdzenie i pakuje build/Stackie-<wersja>.zip. `--github` od razu tworzy wydanie na github.com/woreczko/stackie.
 - Jednorazowo (zrobione 27.11.2026): certyfikat Developer ID Application (Xcode widzi rolę Admin i odmawia, więc przez developer.apple.com z CSR zrobionym w openssl; klucz także w ~/Library/Application Support/StackieSigning/) i profil notaryzacji `xcrun notarytool store-credentials stackie` (Apple ID, Team ID, hasło dla aplikacji z account.apple.com).
 - git push bez zmiany globalnego gita: `git push https://x-access-token:$(gh auth token)@github.com/woreczko/stackie.git main`.
+
+### Zadania z notatki: Claude (od 1.3, Sources/Smart.swift)
+- „Zrób zadania” w notatce wysyła tekst do Claude (model claude-haiku-5-5, odpowiedź w ustalonym formacie JSON) i pokazuje propozycję do zatwierdzenia. Bez klucza: dzielenie po czasownikach (parseDictation).
+- Klucz: własny (Ustawienia → „Wklej swój klucz ze schowka”) albo klucz Stackie odblokowany hasłem. Oba trafiają do pęku kluczy macOS.
+- Klucz Stackie i hasło leżą tylko w ~/Library/Application Support/StackieSigning/claude.key i claude.pass (robi je `./klucz.sh` ze schowka, nic nie pokazuje). zbuduj.sh szyfruje klucz hasłem (PBKDF2 + AES-GCM) do Resources/k.bin. Nigdy nie wkładać klucza do repozytorium.
+- Test zapytania: `STOSIK_CLAUDE_KEY="$(cat …/claude.key)" STOSIK_SMART_TEST="tekst notatki" build/Stosik.app/Contents/MacOS/Stosik`.

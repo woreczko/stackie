@@ -14,7 +14,10 @@ Otwórz link i kliknij **Stackie-….zip** w sekcji *Assets*. Rozpakuj i przeci�
 
 ## Features
 
-- **A deck of notes on your desktop.** Folded, you see the top four plus the calendar; hover and they fan out (in rows on smaller screens).
+- **A deck of notes on your desktop.** Folded, you see three cards (Today, a note and the calendar); hover and they fan out (in rows on smaller screens). Three stack sizes and small notes for laptops.
+- **Today card** at the front: everything due today, grouped by client and project. It returns to the front every morning.
+- **Make tasks with Claude.** Click ✨ *Make tasks* in a messy note and Claude turns it into tasks with client, project and deadline (you approve the proposal first). Needs the Stackie password or your own Claude API key.
+- **Quick note from a screen corner** of your choice.
 - **Projects with tasks.** Tick the circles, watch the progress bar, drag tasks to reorder.
 - **Client, project and tags**, each with its own colour. Click one to filter the stack. Search across everything.
 - **Priority** in three colours, shown as a small layered icon.
@@ -33,7 +36,7 @@ Otwórz link i kliknij **Stackie-….zip** w sekcji *Assets*. Rozpakuj i przeci�
 
 ## Install
 
-1. Download **Stackie-1.2.zip** from [Releases](../../releases).
+1. Download **Stackie-1.3.zip** from [Releases](../../releases).
 2. Unzip it and move **Stosik.app** to **Applications** (on an English Mac it shows as *Stackie*).
 3. Double-click to open. The app is signed and notarized by Apple, so macOS opens it without warnings.
 4. Stackie lives in the menu bar and on your desktop (no Dock icon). A welcome window shows what it can do and asks for the permissions it needs (notifications for reminders, microphone and speech recognition for dictation).
@@ -56,9 +59,9 @@ Your notes are stored in `~/Library/Application Support/Stosik/`.
 
 ## Po polsku: Stosik
 
-**Karteczki na pulpicie Maca, ułożone w stos jak talia kart.** Najedź myszką, a stos się rozłoży. Każda karteczka to projekt z zadaniami, klientem, tagami, terminem i przypomnieniami. Możesz do niej dołączać pliki: PDF-y, zdjęcia i inne. Nowe wersje instalują się same.
+**Karteczki na pulpicie Maca, ułożone w stos jak talia kart.** Najedź myszką, a stos się rozłoży. Każda karteczka to projekt z zadaniami, klientem, tagami, terminem i przypomnieniami. Możesz do niej dołączać pliki: PDF-y, zdjęcia i inne. Kartka „Na dziś”, zadania z chaotycznej notatki dzięki Claude, szybka karteczka z rogu ekranu i trzy rozmiary stosu. Nowe wersje instalują się same.
 
-- **Instalacja:** pobierz **Stackie-1.2.zip** z zakładki [Releases](../../releases), rozpakuj i przenieś **Stosik.app** do **Aplikacji**.
+- **Instalacja:** pobierz **Stackie-1.3.zip** z zakładki [Releases](../../releases), rozpakuj i przenieś **Stosik.app** do **Aplikacji**.
 - **Pierwsze uruchomienie:** otwórz dwuklikiem. Apka jest podpisana i sprawdzona przez Apple, więc macOS jej nie blokuje.
 - **Gdzie jest:** Stosik siedzi w pasku menu i na pulpicie, bez ikony w Docku. Okienko powitalne pokaże, co umie, i poprosi o zgody: powiadomienia do przypomnień oraz mikrofon i rozpoznawanie mowy do dyktowania.
 - **Wymagania:** macOS 14 albo nowszy, Mac z Apple Silicon albo z Intelem.

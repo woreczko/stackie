@@ -15,6 +15,16 @@ for s in 16 32 128 256 512; do
   sips -z $((s*2)) $((s*2)) "$B/ikona.png" --out "$B/ikona.iconset/icon_${s}x${s}@2x.png" >/dev/null
 done
 iconutil -c icns "$B/ikona.iconset" -o "$A/Contents/Resources/ikona.icns"
+# klucz Claude dla „Zrób zadania”: tylko z plików na tym Macu (nigdy w repozytorium),
+# w apce zaszyfrowany hasłem (bez hasła nie da się go odczytać); pliki robi ./klucz.sh
+KD="$HOME/Library/Application Support/StackieSigning"
+if [[ -s "$KD/claude.key" && -s "$KD/claude.pass" ]]; then
+  if STOSIK_SEAL_KEY="$KD/claude.key" STOSIK_SEAL_PASS="$KD/claude.pass" "$A/Contents/MacOS/Stosik" > "$B/k.bin" && [[ -s "$B/k.bin" ]]; then
+    mv "$B/k.bin" "$A/Contents/Resources/k.bin"
+  else
+    rm -f "$B/k.bin"; echo "Uwaga: nie udało się zaszyfrować klucza Claude (sprawdź ./klucz.sh). Apka bez wbudowanego klucza."
+  fi
+fi
 # nazwa apki w Finderze i powiadomieniach: po polsku Stosik, po angielsku Stackie
 mkdir -p "$A/Contents/Resources/pl.lproj" "$A/Contents/Resources/en.lproj"
 printf '"CFBundleDisplayName" = "Stosik";\n"CFBundleName" = "Stosik";\n' > "$A/Contents/Resources/pl.lproj/InfoPlist.strings"
