@@ -108,22 +108,17 @@ final class UIState: ObservableObject {
     /// Przytrzymany przycisk myszy na pasku: przenosimy stos.
     @Published var toolHold = false
     @Published var showFilter = false
-    @Published var showSettings = false
+    @Published var showSettings = false { didSet { if !showSettings { opacityPreview = false } } }
     /// Przezroczystość stosu w spoczynku (1 = pełny). Po najechaniu, w ustawieniach i przy edycji stos jest pełny.
     @Published var restOpacity: Double = {
         let v = UserDefaults.standard.double(forKey: "stackOpacity"); return v > 0 ? v : 1
     }() { didSet { UserDefaults.standard.set(restOpacity, forKey: "stackOpacity") } }
     /// Podgląd: przesuwamy suwak, więc pokazujemy prawdziwą przezroczystość mimo otwartych ustawień.
     @Published var opacityPreview = false
-    private var previewEnd: DispatchWorkItem?
-    /// Suwak w ustawieniach: stos od razu pokazuje nową przezroczystość, 2 s po ostatnim ruchu wraca do pełnego.
+    /// Suwak w ustawieniach: stos od razu pokazuje nową przezroczystość i trzyma ją, dopóki ustawienia są otwarte.
     func previewOpacity(_ v: Double) {
         restOpacity = v
         if !opacityPreview { opacityPreview = true }
-        previewEnd?.cancel()
-        let w = DispatchWorkItem { [weak self] in self?.opacityPreview = false }
-        previewEnd = w
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: w)
     }
     private var expandWork: DispatchWorkItem?
     private var foldWork: DispatchWorkItem?
@@ -729,6 +724,7 @@ struct StackRoot: View {
                     .frame(width: g.size.width / k, height: g.size.height / k, alignment: .topLeading)
                     .scaleEffect(k, anchor: .topLeading)
                     .frame(width: g.size.width, height: g.size.height, alignment: .topLeading)
+                    .compositingGroup()   // cały stos blednie razem, karteczki nie prześwitują przez siebie
                     .opacity(awake ? 1 : ui.restOpacity)
                     .animation(.easeOut(duration: 0.25), value: awake)
                     .animation(.easeOut(duration: 0.12), value: ui.restOpacity)
