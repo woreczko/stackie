@@ -115,6 +115,16 @@ final class UIState: ObservableObject {
     }() { didSet { UserDefaults.standard.set(restOpacity, forKey: "stackOpacity") } }
     /// Podgląd: przesuwamy suwak, więc pokazujemy prawdziwą przezroczystość mimo otwartych ustawień.
     @Published var opacityPreview = false
+    private var previewEnd: DispatchWorkItem?
+    /// Suwak w ustawieniach: stos od razu pokazuje nową przezroczystość, 2 s po ostatnim ruchu wraca do pełnego.
+    func previewOpacity(_ v: Double) {
+        restOpacity = v
+        if !opacityPreview { opacityPreview = true }
+        previewEnd?.cancel()
+        let w = DispatchWorkItem { [weak self] in self?.opacityPreview = false }
+        previewEnd = w
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: w)
+    }
     private var expandWork: DispatchWorkItem?
     private var foldWork: DispatchWorkItem?
     /// Co kilka sekund +1: karteczki z bliskim terminem podskakują.
@@ -721,6 +731,7 @@ struct StackRoot: View {
                     .frame(width: g.size.width, height: g.size.height, alignment: .topLeading)
                     .opacity(awake ? 1 : ui.restOpacity)
                     .animation(.easeOut(duration: 0.25), value: awake)
+                    .animation(.easeOut(duration: 0.12), value: ui.restOpacity)
                 Toolbar(count: notes.count, newNote: newNote)
                     .offset(x: StackLayout.toolX * k, y: StackLayout.toolbarY(ui.spread) * k)
             }
@@ -828,9 +839,9 @@ struct SettingsView: View {
             }
             row(L("Przezroczystość stosu")) {
                 HStack(spacing: 10) {
-                    Slider(value: $opacity, in: 0.3...1, onEditingChanged: { e in UIState.shared.opacityPreview = e })
+                    Slider(value: $opacity, in: 0.3...1)
                         .controlSize(.small)
-                        .onChange(of: opacity) { _, v in UIState.shared.restOpacity = v }
+                        .onChange(of: opacity) { _, v in UIState.shared.previewOpacity(v) }
                     Text("\(Int((opacity * 100).rounded()))%").font(.system(size: 12, weight: .medium).monospacedDigit())
                         .foregroundStyle(.secondary).frame(width: 38, alignment: .trailing)
                 }
