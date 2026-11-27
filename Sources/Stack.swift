@@ -108,18 +108,14 @@ final class UIState: ObservableObject {
     /// Przytrzymany przycisk myszy na pasku: przenosimy stos.
     @Published var toolHold = false
     @Published var showFilter = false
-    @Published var showSettings = false { didSet { if !showSettings { opacityPreview = false } } }
+    @Published var showSettings = false
     /// Przezroczystość stosu w spoczynku (1 = pełny). Po najechaniu, w ustawieniach i przy edycji stos jest pełny.
     @Published var restOpacity: Double = {
         let v = UserDefaults.standard.double(forKey: "stackOpacity"); return v > 0 ? v : 1
     }() { didSet { UserDefaults.standard.set(restOpacity, forKey: "stackOpacity") } }
-    /// Podgląd: przesuwamy suwak, więc pokazujemy prawdziwą przezroczystość mimo otwartych ustawień.
-    @Published var opacityPreview = false
-    /// Suwak w ustawieniach: stos od razu pokazuje nową przezroczystość i trzyma ją, dopóki ustawienia są otwarte.
-    func previewOpacity(_ v: Double) {
-        restOpacity = v
-        if !opacityPreview { opacityPreview = true }
-    }
+    /// Kursor nad karteczkami (nie nad paskiem): tylko wtedy przezroczysty stos robi się pełny.
+    @Published var pointerIn = false
+    private func setIn(_ v: Bool) { if pointerIn != v { pointerIn = v } }
     private var expandWork: DispatchWorkItem?
     private var foldWork: DispatchWorkItem?
     /// Co kilka sekund +1: karteczki z bliskim terminem podskakują.
@@ -184,16 +180,16 @@ final class UIState: ObservableObject {
         }
         if icon != toolIcon { toolIcon = icon }
         updateExpand()
-        guard let p else { return scheduleCollapse() }
+        guard let p else { setIn(false); return scheduleCollapse() }
         // z karteczek na pasek: stos zostaje rozłożony
-        if toolbarHover && spread { collapse?.cancel(); collapse = nil; return }
+        if toolbarHover && spread { setIn(false); collapse?.cancel(); collapse = nil; return }
         var spreadNow = spread
         if !spreadNow {
             let r = CGRect(x: StackLayout.padX - 6, y: StackLayout.padTop - 12,
                            width: StackLayout.collapsedWidth(slots(notes)) + 12, height: StackLayout.cardH + 14)
             if r.contains(p), !notes.isEmpty { spreadNow = true }
         }
-        guard spreadNow else { return scheduleCollapse() }
+        guard spreadNow else { setIn(false); return scheduleCollapse() }
         // miejsca w stosie: najpierw „Na dziś” (jeśli jest), potem karteczki
         let ids = slotIDs(notes)
         let n = ids.count
@@ -202,11 +198,12 @@ final class UIState: ObservableObject {
         if let h { order.removeAll { $0 == h }; order.insert(h, at: 0) }
         let calRect = CGRect(x: StackLayout.calX(n, spread: true, hovered: h), y: StackLayout.calY(n, spread: true) - 14,
                              width: StackLayout.calW, height: StackLayout.calH + 28)
-        if hovered == CAL_ID, calRect.contains(p) { collapse?.cancel(); collapse = nil; return }
+        if hovered == CAL_ID, calRect.contains(p) { setIn(true); collapse?.cancel(); collapse = nil; return }
         for i in order {
             let r = CGRect(x: StackLayout.x(i, spread: true, hovered: h), y: StackLayout.y(i, spread: true) - 14,
                            width: StackLayout.cardW, height: StackLayout.cardH + 28)
             if r.contains(p) {
+                setIn(true)
                 collapse?.cancel(); collapse = nil
                 if !spread { spread = true }
                 if hovered != ids[i] { hovered = ids[i] }
@@ -214,6 +211,7 @@ final class UIState: ObservableObject {
             }
         }
         if calRect.contains(p) {
+            setIn(true)
             collapse?.cancel(); collapse = nil
             if !spread { spread = true }
             if hovered != CAL_ID { hovered = CAL_ID }
@@ -225,8 +223,9 @@ final class UIState: ObservableObject {
             let bounds = CGRect(x: StackLayout.padX - 14, y: top,
                                 width: StackLayout.width(n) - StackLayout.padX * 2 + 28,
                                 height: StackLayout.toolbarY(true) + StackLayout.toolbarH + 16 - top)
-            if bounds.contains(p) { collapse?.cancel(); collapse = nil; return }
+            if bounds.contains(p) { setIn(!toolbarHover); collapse?.cancel(); collapse = nil; return }
         }
+        setIn(false)
         scheduleCollapse()
     }
 
@@ -719,7 +718,8 @@ struct StackRoot: View {
         GeometryReader { g in
             let k = StackLayout.scale
             ZStack(alignment: .topLeading) {
-                let awake = !ui.opacityPreview && (ui.spread || ui.showSettings || ui.showFilter || ui.toolExpanded || ui.dragID != nil)
+                // pełny tylko pod kursorem, przy przeciąganiu i szukaniu; z otwartymi ustawieniami widać prawdziwą przezroczystość
+                let awake = !ui.showSettings && (ui.pointerIn || ui.dragID != nil || ui.showFilter)
                 StackView(openEditor: openEditor, newNote: newNote, openCalendar: openCalendar)
                     .frame(width: g.size.width / k, height: g.size.height / k, alignment: .topLeading)
                     .scaleEffect(k, anchor: .topLeading)
@@ -837,7 +837,7 @@ struct SettingsView: View {
                 HStack(spacing: 10) {
                     Slider(value: $opacity, in: 0.3...1)
                         .controlSize(.small)
-                        .onChange(of: opacity) { _, v in UIState.shared.previewOpacity(v) }
+                        .onChange(of: opacity) { _, v in UIState.shared.restOpacity = v }
                     Text("\(Int((opacity * 100).rounded()))%").font(.system(size: 12, weight: .medium).monospacedDigit())
                         .foregroundStyle(.secondary).frame(width: 38, alignment: .trailing)
                 }

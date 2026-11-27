@@ -6,8 +6,28 @@ import UserNotifications
 struct TaskItem: Codable, Identifiable, Equatable {
     var id = UUID()
     var text = ""
-    var done = false
+    var done = false { didSet { if done { doing = false } } }
     var doneAt: Date? = nil
+    /// „W trakcie” (pół kółka): trzeci stan między niezrobionym a zrobionym.
+    var doing = false
+}
+
+extension TaskItem {
+    enum K: String, CodingKey { case id, text, done, doneAt, doing }
+    init(from d: Decoder) throws {
+        let c = try d.container(keyedBy: K.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        text = try c.decodeIfPresent(String.self, forKey: .text) ?? ""
+        done = try c.decodeIfPresent(Bool.self, forKey: .done) ?? false
+        doneAt = try c.decodeIfPresent(Date.self, forKey: .doneAt)
+        doing = try c.decodeIfPresent(Bool.self, forKey: .doing) ?? false
+    }
+    func encode(to e: Encoder) throws {
+        var c = e.container(keyedBy: K.self)
+        try c.encode(id, forKey: .id); try c.encode(text, forKey: .text); try c.encode(done, forKey: .done)
+        try c.encodeIfPresent(doneAt, forKey: .doneAt)
+        if doing { try c.encode(true, forKey: .doing) }   // stary zapis bez pola zostaje taki sam
+    }
 }
 
 /// Plik dołączony do karteczki. Kopia leży w zalaczniki/<id karteczki>/<id pliku>/<nazwa>.

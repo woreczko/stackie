@@ -58,10 +58,16 @@ struct CheckCircle: View {
     var done: Bool
     var color: Color
     var size: CGFloat = 17
+    /// „W trakcie”: lewa połówka kółka wypełniona.
+    var doing = false
 
     var body: some View {
         ZStack {
             Circle().strokeBorder(color.opacity(done ? 0 : 0.75), lineWidth: 1.4)
+            if doing && !done {
+                Circle().fill(color.opacity(0.75)).padding(size * 0.2)
+                    .mask(HStack(spacing: 0) { Rectangle(); Color.clear })
+            }
             if done {
                 Circle().fill(color)
                 Image(systemName: "checkmark").font(.system(size: size * 0.5, weight: .heavy))

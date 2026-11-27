@@ -133,7 +133,10 @@ struct EditorView: View {
                                 .onHover { h in (h ? NSCursor.openHand : NSCursor.arrow).set() }
                                 .gesture(reorder(t.id))
                                 .help(L("Przeciągnij, żeby zmienić kolejność"))
-                            Button { t.done.toggle() } label: { CheckCircle(done: t.done, color: fg, size: 18) }
+                            Button {
+                                if NSEvent.modifierFlags.contains(.option) && !t.done { t.doing.toggle() } else { t.done.toggle() }
+                            } label: { CheckCircle(done: t.done, color: fg, size: 18, doing: t.doing) }
+                                .help(L("Kliknij: zrobione. ⌥ i kliknij: w trakcie."))
                                 .buttonStyle(.plain).padding(.top, 4)
                             // w edytorze całe zadanie, zawinięte; na karteczce zostaje jedna linia
                             TextField("", text: $t.text, axis: .vertical)
@@ -211,6 +214,10 @@ struct EditorView: View {
                         .transaction { if dragging && !$0[LiftKey.self] { $0.animation = nil } }
                         .onHover { h in hoverTask = h ? t.id : (hoverTask == t.id ? nil : hoverTask) }
                         .contextMenu {
+                            if !t.done {
+                                Button(t.doing ? L("Już nie w trakcie") : L("W trakcie")) { t.doing.toggle() }
+                                Divider()
+                            }
                             sendMenu(t.id)
                             Divider()
                             Button(L("Usuń zadanie"), role: .destructive) { removeTask(t.id) }

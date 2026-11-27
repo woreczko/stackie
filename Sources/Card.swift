@@ -122,7 +122,11 @@ struct CardView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(Array(note.tasks.prefix(maxTasks).enumerated()), id: \.element.id) { i, t in
                         HStack(alignment: .top, spacing: 7) {
-                            Button { note.tasks[i].done.toggle() } label: { CheckCircle(done: t.done, color: fg, size: 15) }
+                            Button {
+                                // ⌥-klik: „w trakcie”; zwykły klik: zrobione
+                                if NSEvent.modifierFlags.contains(.option) && !t.done { note.tasks[i].doing.toggle() }
+                                else { note.tasks[i].done.toggle() }
+                            } label: { CheckCircle(done: t.done, color: fg, size: 15, doing: t.doing) }
                                 .buttonStyle(.plain)
                             Text(t.text.isEmpty ? "…" : t.text)
                                 .font(.system(size: 12.5))
