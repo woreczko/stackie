@@ -24,6 +24,8 @@ struct EditorView: View {
     @State private var smartError: String?
     @State private var sendTask: UUID?          // zadanie, dla którego otwarta jest lista karteczek
     @State private var sendCopy = false         // true: kopiuj, false: przenieś
+    @State private var sentInfo: String?        // dymek „Przeniesiono do: …”
+    @State private var sentToken = 0
     private let rowGap: CGFloat = 8     // odstęp między wierszami zadań
 
     var body: some View {
@@ -289,6 +291,21 @@ struct EditorView: View {
                     if let f { withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(f, anchor: .center) } }
                 }
             }
+            .overlay(alignment: .bottom) {
+                if let sentInfo {
+                    HStack(spacing: 6) {
+                        Image(systemName: sendCopy ? "doc.on.doc" : "arrowshape.turn.up.right").font(.system(size: 10, weight: .bold))
+                        Text(sentInfo).font(.system(size: 12, weight: .semibold)).lineLimit(1)
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12).frame(height: 28)
+                    .background(Capsule().fill(Color.ink.opacity(0.88)))
+                    .shadow(color: .black.opacity(0.2), radius: 6, y: 3)
+                    .padding(.bottom, 44)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .allowsHitTesting(false)
+                }
+            }
 
             HStack {
                 Button { close(); store.delete(id) } label: {
@@ -530,6 +547,13 @@ struct EditorView: View {
         store.notes[i].tasks.append(t)
         if !copy { note.wrappedValue.tasks.removeAll { $0.id == tid } }
         NSSound(named: "Pop")?.play()
+        let name = store.notes[i].title.isEmpty ? L("Bez tytułu") : store.notes[i].title
+        sentToken += 1
+        let token = sentToken
+        withAnimation(.spring(response: 0.3)) { sentInfo = LF(copy ? "Skopiowano do: %@" : "Przeniesiono do: %@", name) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.4) {
+            if sentToken == token { withAnimation(.easeOut(duration: 0.25)) { sentInfo = nil } }
+        }
     }
 }
 

@@ -5,7 +5,7 @@ import UserNotifications
 
 // MARK: - Okienko powitalne: strony z animacjami możliwości i historia zmian
 
-let APP_VERSION = "1.4"
+let APP_VERSION = "1.4.1"
 
 /// `since`: wersja, w której funkcja się pojawiła (po aktualizacji pokazujemy tylko nowsze strony).
 struct WelcomePage { let title: String; let text: String; let demo: AnyView; var since = "1.0" }
@@ -44,7 +44,8 @@ struct WelcomeView: View {
             WelcomePage(title: L("Dyktowanie"), text: L("Kliknij mikrofon i powiedz, co jest do zrobienia. Każdy czasownik zaczyna nowe zadanie, a „klient”, „projekt” i „tag” wypełniają pola."), demo: AnyView(DemoDictation())),
             WelcomePage(title: L("Na dziś"), text: L("Biała kartka na początku stosu zbiera wszystko z terminem na dziś, po klientach. Możesz ją przesunąć, rano wraca na pierwsze miejsce."), demo: AnyView(DemoToday()), since: "1.3"),
             WelcomePage(title: L("Zadania z notatki"), text: L("Piszesz szybko i bez ładu, np. przy telefonie. Kliknij ✨ „Zrób zadania”, a Claude ułoży z tego listę zadań z klientem i terminem. Najpierw zobaczysz propozycję."), demo: AnyView(DemoSmart()), since: "1.3"),
-            WelcomePage(title: L("Szybka karteczka z rogu"), text: L("Wjedź kursorem w wybrany róg ekranu, a wyskoczy nowa karteczka. Róg wybierasz w ustawieniach pod kółkiem zębatym."), demo: AnyView(DemoCorner()), since: "1.3"),
+            WelcomePage(title: L("Szybka notatka z rogu"), text: L("Wjedź kursorem w róg ekranu i pisz albo dyktuj, na brudno. Potem zapisz albo kliknij ✨ „Zrób zadania”. Róg wybierasz w ustawieniach pod kółkiem zębatym."), demo: AnyView(DemoCorner()), since: "1.4.1"),
+            WelcomePage(title: L("Przenieś albo skopiuj zadanie"), text: L("Najedź na zadanie i kliknij strzałkę obok krzyżyka. Wybierz karteczkę z listy, a zadanie przejdzie tam albo trafi do obu."), demo: AnyView(DemoMove()), since: "1.4.1"),
             WelcomePage(title: L("Rozmiar stosu"), text: L("Mały ekran? W ustawieniach pod kółkiem zębatym zmniejszysz stos albo przełączysz się na małe karteczki: sam tytuł, data i licznik."), demo: AnyView(DemoSizes()), since: "1.3"),
         ]
     }
@@ -121,6 +122,13 @@ struct WelcomeView: View {
 struct Release { let version: String; let date: String; let items: [String] }
 
 var RELEASES: [Release] {[
+    Release(version: "1.4.1", date: "27.11.2026", items: [
+        L("Szybka notatka z rogu ekranu: pisz albo dyktuj, zapisz na brudno albo zrób z tego zadania"),
+        L("Przenieś albo skopiuj zadanie na inną karteczkę"),
+        L("Kopiuj, wklej i cofnij (⌘C, ⌘V, ⌘Z) działają w polach tekstowych"),
+        L("Enter w zadaniu dodaje następne; „Dodaj zadanie” trzyma się dołu przy długiej liście"),
+        L("Termin w jednej linii z rozwijanym „Kiedy”; klient, projekt i tagi jako pastylki"),
+    ]),
     Release(version: "1.4", date: "27.11.2026", items: [
         L("Sprawdź aktualizacje z palca: w ustawieniach pod zębatką albo w menu w pasku"),
         L("Samoczynne sprawdzanie przy starcie oraz o 10:37 i 21:37"),
@@ -660,24 +668,88 @@ struct DemoSizes: View {
 /// Kursor jedzie w lewy dolny róg ekranu, róg się podświetla i wyskakuje pusta karteczka.
 struct DemoCorner: View {
     var body: some View {
-        Loop(period: 4.2) { t in
-            let go = ease(t, 0.05, 0.4), pop = ease(t, 0.5, 0.68), out = ease(t, 0.9, 1.0)
+        Loop(period: 6.0) { t in
+            let go = ease(t, 0.03, 0.25), pop = ease(t, 0.3, 0.4), out = ease(t, 0.92, 1.0)
+            let full = L("Beata dzwoniła, reklama do ELLE na piątek!! logo od Kampa")
+            let typed = String(full.prefix(Int(Double(full.count) * ease(t, 0.42, 0.78))))
+            let press = ease(t, 0.8, 0.84) * (1 - ease(t, 0.86, 0.9))
             ZStack {
                 // ekran
                 RoundedRectangle(cornerRadius: 10).strokeBorder(.white.opacity(0.25), lineWidth: 1.5)
                     .frame(width: 360, height: 210)
                 // podświetlony róg
-                Circle().fill(Color(hex: 0x9BE08F).opacity(0.55 * ease(t, 0.38, 0.45) * (1 - pop * 0.6)))
+                Circle().fill(Color(hex: 0x9BE08F).opacity(0.55 * ease(t, 0.22, 0.28) * (1 - pop * 0.6)))
                     .frame(width: 46, height: 46).blur(radius: 8)
                     .offset(x: -180, y: 105)
-                DemoCard(note: demoNote(2, L("Nowa karteczka"), []), scale: 0.5)
-                    .scaleEffect(0.6 + 0.4 * pop).opacity(pop)
-                    .shadow(color: .black.opacity(0.35), radius: 10, y: 5)
-                    .offset(x: -40, y: 10 - 14 * pop)
+                // okienko szybkiej notatki na środku
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(L("Szybka notatka")).font(.system(size: 7.5, weight: .bold)).tracking(0.6).textCase(.uppercase)
+                        .foregroundStyle(Color.ink.opacity(0.5))
+                    Text(typed).font(.system(size: 10.5)).foregroundStyle(Color.ink.opacity(0.85))
+                        .frame(width: 236, height: 46, alignment: .topLeading)
+                    HStack(spacing: 5) {
+                        Label(L("Dyktuj"), systemImage: "mic.fill").font(.system(size: 8, weight: .semibold)).lineLimit(1).fixedSize()
+                            .padding(.horizontal, 7).padding(.vertical, 4).background(Capsule().fill(Color.ink.opacity(0.08)))
+                        Spacer()
+                        Text(L("Zapisz na brudno")).font(.system(size: 8, weight: .semibold)).lineLimit(1).fixedSize()
+                            .padding(.horizontal, 7).padding(.vertical, 4).background(Capsule().fill(Color.ink.opacity(0.08)))
+                        HStack(spacing: 3) { Image(systemName: "sparkles"); Text(L("Zrób zadania")) }.lineLimit(1).fixedSize()
+                            .font(.system(size: 8, weight: .semibold)).foregroundStyle(.white)
+                            .padding(.horizontal, 8).padding(.vertical, 4).background(Capsule().fill(Color.ink))
+                            .scaleEffect(1 + 0.12 * press)
+                            .shadow(color: Color(hex: 0x8B7CF6).opacity(0.9 * press), radius: 8)
+                    }
+                    .foregroundStyle(Color.ink)
+                }
+                .padding(11)
+                .frame(width: 260)
+                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color(hex: 0xF7F1E7)))
+                .shadow(color: .black.opacity(0.35), radius: 10, y: 5)
+                .scaleEffect(0.7 + 0.3 * pop).opacity(pop)
                 Image(systemName: "cursorarrow").font(.system(size: 20)).foregroundStyle(.white).shadow(radius: 2)
                     .offset(x: 80 - 254 * go, y: -30 + 132 * go)
+                    .opacity(1 - pop)
             }
             .opacity(1 - out)
+        }
+    }
+}
+
+/// Zadanie wychodzi z jednej karteczki i ląduje na drugiej.
+struct DemoMove: View {
+    var body: some View {
+        Loop(period: 5.0) { t in
+            let menu = ease(t, 0.12, 0.2) * (1 - ease(t, 0.32, 0.36))
+            let fly = ease(t, 0.36, 0.62), landed = t > 0.62, gone = t > 0.36
+            let task = L("Wysłać fakturę")
+            ZStack {
+                HStack(spacing: 60) {
+                    DemoCard(note: demoNote(6, L("Faktury"), gone ? [L("Zebrać paragony")] : [L("Zebrać paragony"), task],
+                                            client: "Studio Nova"), scale: 0.74)
+                        .shadow(color: .black.opacity(0.3), radius: 8, y: 4).rotationEffect(.degrees(-2))
+                    DemoCard(note: demoNote(2, L("Na piątek"), landed ? [L("Zadzwonić do drukarni"), task] : [L("Zadzwonić do drukarni")],
+                                            client: "Studio Nova"), scale: 0.74)
+                        .shadow(color: .black.opacity(0.3), radius: 8, y: 4).rotationEffect(.degrees(2.5))
+                }
+                // menu przy zadaniu
+                Text(L("Przenieś na inną karteczkę…")).font(.system(size: 9, weight: .medium)).foregroundStyle(Color.ink)
+                    .padding(.horizontal, 8).padding(.vertical, 5)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(.white))
+                    .shadow(color: .black.opacity(0.3), radius: 6, y: 3)
+                    .opacity(menu).scaleEffect(0.9 + 0.1 * menu)
+                    .offset(x: -40, y: 40)
+                // lecące zadanie
+                HStack(spacing: 5) {
+                    Circle().strokeBorder(Color.ink.opacity(0.6), lineWidth: 1.2).frame(width: 9, height: 9)
+                    Text(task).font(.system(size: 9.5, weight: .medium)).foregroundStyle(Color.ink)
+                }
+                .padding(.horizontal, 8).padding(.vertical, 4)
+                .background(Capsule().fill(.white))
+                .shadow(color: .black.opacity(0.35), radius: 6, y: 3)
+                .offset(x: -110 + 230 * fly, y: 12 - 50 * sin(fly * .pi))
+                .opacity(t > 0.34 && !landed ? 1 : 0)
+            }
+            .opacity(1 - ease(t, 0.93, 1.0))
         }
     }
 }

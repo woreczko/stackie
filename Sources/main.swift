@@ -815,14 +815,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             if let w = self.trashWin { shot(w, "11_kosz") }
             self.trashWin?.orderOut(nil)
         }
-        // po aktualizacji z 1.2: same nowości
-        for (k, pg) in [(7.8, 0), (7.85, 1), (7.9, 2), (7.95, 3)] {
+        // po aktualizacji z 1.4: same nowości (klatka w połowie pokazu)
+        for (k, pg, ph) in [(7.8, 0, 0.6), (7.9, 1, 0.5)] {
             DispatchQueue.main.asyncAfter(deadline: .now() + k) {
+                FROZEN_PHASE = ph
                 let w = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 560, height: 470), styleMask: [.borderless], backing: .buffered, defer: false)
                 w.appearance = NSAppearance(named: .aqua)
-                w.contentView = NSHostingView(rootView: WelcomeView(close: {}, startPage: pg, newSince: "1.2"))
+                w.contentView = NSHostingView(rootView: WelcomeView(close: {}, startPage: pg, newSince: "1.4"))
                 w.orderFront(nil)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { shot(w, "18_nowosci_\(pg)"); w.orderOut(nil) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) { shot(w, "18_nowosci_\(pg)"); w.orderOut(nil); FROZEN_PHASE = nil }
             }
         }
         for (k, pg) in [(8.0, 0), (8.4, 1), (8.8, 2), (9.0, 3), (9.2, 4), (9.4, 5), (9.6, 6), (10.0, 7), (10.4, 8), (10.8, 9), (10.9, 10), (10.95, 11), (11.0, 12), (11.05, 13)] {
