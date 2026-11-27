@@ -159,6 +159,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
         // test zapytania do Claude (wypisuje wynik i kończy)
         if let t = ProcessInfo.processInfo.environment["STOSIK_SMART_TEST"] {
+            print("ENGINE \(Smart.engine) apple=\(AppleAI.state)")
             Smart.propose(t) { r in
                 switch r {
                 case .success(let p): print("SMART ok ai=\(p.viaAI) title=\(p.title) client=\(p.result.client) tasks=\(p.result.tasks) due=\(String(describing: p.result.deadline))")

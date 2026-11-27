@@ -123,10 +123,22 @@ enum SmartError: LocalizedError {
 enum Smart {
     static let model = "claude-haiku-5-5"
 
-    /// Bez klucza od razu dzielenie po czasownikach; z kluczem pytanie do Claude.
+    /// Czym „Zrób zadania” liczy: Pro (Claude, z kluczem), Standard z Apple Intelligence (na urządzeniu)
+    /// albo Standard bez AI (dzielenie po czasownikach), gdy Apple Intelligence tu nie działa.
+    enum Engine { case claude, apple, basic }
+    static var engine: Engine { ClaudeKey.value != nil ? .claude : AppleAI.available ? .apple : .basic }
+
     static func propose(_ text: String, completion: @escaping (Result<SmartProposal, SmartError>) -> Void) {
         guard let key = ClaudeKey.value else {
-            completion(.success(SmartProposal(result: parseDictation(text), viaAI: false)))
+            let basic = SmartProposal(result: parseDictation(text), viaAI: false)
+            if AppleAI.available {
+                // błąd modelu na urządzeniu: zostaje proste dzielenie, bez komunikatu
+                AppleAI.propose(text, instructions: systemPrompt()) { o in
+                    DispatchQueue.main.async { completion(.success(o.map(proposal(from:)) ?? basic)) }
+                }
+            } else {
+                completion(.success(basic))
+            }
             return
         }
         var req = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!)
@@ -166,7 +178,7 @@ enum Smart {
         }.resume()
     }
 
-    private static func proposal(from o: [String: Any]) -> SmartProposal {
+    static func proposal(from o: [String: Any]) -> SmartProposal {
         var p = SmartProposal(viaAI: true)
         p.title = (o["title"] as? String ?? "").trimmingCharacters(in: .whitespaces)
         p.result.client = (o["client"] as? String ?? "").trimmingCharacters(in: .whitespaces)
@@ -200,7 +212,7 @@ enum Smart {
         "additionalProperties": false,
     ]
 
-    private static func systemPrompt() -> String {
+    static func systemPrompt() -> String {
         let df = DateFormatter(); df.locale = Locale(identifier: "pl_PL"); df.dateFormat = "EEEE, yyyy-MM-dd, HH:mm"
         let clients = Array(Set(Store.shared.notes.map(\.client).filter { !$0.isEmpty })).sorted().prefix(40)
         let projects = Array(Set(Store.shared.notes.map(\.project).filter { !$0.isEmpty })).sorted().prefix(40)

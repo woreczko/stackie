@@ -109,6 +109,12 @@ final class UIState: ObservableObject {
     @Published var toolHold = false
     @Published var showFilter = false
     @Published var showSettings = false
+    /// Przezroczystość stosu w spoczynku (1 = pełny). Po najechaniu, w ustawieniach i przy edycji stos jest pełny.
+    @Published var restOpacity: Double = {
+        let v = UserDefaults.standard.double(forKey: "stackOpacity"); return v > 0 ? v : 1
+    }() { didSet { UserDefaults.standard.set(restOpacity, forKey: "stackOpacity") } }
+    /// Podgląd: przesuwamy suwak, więc pokazujemy prawdziwą przezroczystość mimo otwartych ustawień.
+    @Published var opacityPreview = false
     private var expandWork: DispatchWorkItem?
     private var foldWork: DispatchWorkItem?
     /// Co kilka sekund +1: karteczki z bliskim terminem podskakują.
@@ -708,10 +714,13 @@ struct StackRoot: View {
         GeometryReader { g in
             let k = StackLayout.scale
             ZStack(alignment: .topLeading) {
+                let awake = !ui.opacityPreview && (ui.spread || ui.showSettings || ui.showFilter || ui.toolExpanded || ui.dragID != nil)
                 StackView(openEditor: openEditor, newNote: newNote, openCalendar: openCalendar)
                     .frame(width: g.size.width / k, height: g.size.height / k, alignment: .topLeading)
                     .scaleEffect(k, anchor: .topLeading)
                     .frame(width: g.size.width, height: g.size.height, alignment: .topLeading)
+                    .opacity(awake ? 1 : ui.restOpacity)
+                    .animation(.easeOut(duration: 0.25), value: awake)
                 Toolbar(count: notes.count, newNote: newNote)
                     .offset(x: StackLayout.toolX * k, y: StackLayout.toolbarY(ui.spread) * k)
             }
@@ -788,9 +797,11 @@ struct SettingsView: View {
     @State private var lang = Lang.setting
     @State private var corner = AppDelegate.shared?.hotCorner ?? 0
     @ObservedObject private var updater = Updater.shared
-    @State private var hasKey = ClaudeKey.isOwn
+    @State private var hasKey = ClaudeKey.isSet
     @State private var keyNote: String?
     @State private var password = ""
+    @State private var proOpen = false
+    @State private var opacity = UIState.shared.restOpacity
     @State private var login = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -815,15 +826,38 @@ struct SettingsView: View {
                 CornerPicker(selection: $corner)
                     .onChange(of: corner) { _, v in AppDelegate.shared?.hotCorner = v }
             }
-            row(L("Zadania z notatki: klucz Claude")) {
-                if hasKey {
-                    HStack(spacing: 6) {
-                        Label(ClaudeKey.isOwn ? L("Twój klucz zapisany") : L("Klucz Stackie odblokowany"), systemImage: "checkmark.seal.fill")
-                            .font(.system(size: 12, weight: .medium)).foregroundStyle(.green)
-                        Spacer()
-                        smallPill(L("Usuń")) { ClaudeKey.delete(); hasKey = false; keyNote = nil; password = "" }
+            row(L("Przezroczystość stosu")) {
+                HStack(spacing: 10) {
+                    Slider(value: $opacity, in: 0.3...1, onEditingChanged: { e in UIState.shared.opacityPreview = e })
+                        .controlSize(.small)
+                        .onChange(of: opacity) { _, v in UIState.shared.restOpacity = v }
+                    Text("\(Int((opacity * 100).rounded()))%").font(.system(size: 12, weight: .medium).monospacedDigit())
+                        .foregroundStyle(.secondary).frame(width: 38, alignment: .trailing)
+                }
+                Text(L("Po najechaniu stos jest zawsze pełny.")).font(.system(size: 10.5)).foregroundStyle(.secondary)
+            }
+            row(L("Zadania z notatki")) {
+                HStack(spacing: 6) {
+                    planBadge
+                    Spacer()
+                    if hasKey {
+                        smallPill(L("Wróć do Standard")) { ClaudeKey.delete(); hasKey = false; keyNote = nil; password = ""; proOpen = false }
+                    } else {
+                        Button { withAnimation(.easeOut(duration: 0.2)) { proOpen.toggle() } } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "sparkles").font(.system(size: 10, weight: .bold))
+                                Text(L("Przejdź na Pro")).font(.system(size: 12, weight: .semibold))
+                            }
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 11).padding(.vertical, 5)
+                            .background(Capsule().fill(LinearGradient(colors: [Color(hex: 0x8B7CF6), Color(hex: 0xD9468F)],
+                                                                      startPoint: .leading, endPoint: .trailing)))
+                            .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
                     }
-                } else {
+                }
+                if !hasKey && proOpen {
                     if ClaudeKey.hasBuiltIn {
                         HStack(spacing: 6) {
                             SecureField(L("Hasło do klucza Stackie"), text: $password)
@@ -834,12 +868,11 @@ struct SettingsView: View {
                     }
                     smallPill(L("Wklej swój klucz ze schowka")) {
                         let s = (NSPasteboard.general.string(forType: .string) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                        if s.hasPrefix("sk-ant-") { ClaudeKey.save(s); hasKey = ClaudeKey.isSet; keyNote = nil }
+                        if s.hasPrefix("sk-ant-") { ClaudeKey.save(s); hasKey = ClaudeKey.isSet; keyNote = nil; proOpen = false }
                         else { keyNote = L("W schowku nie ma klucza (zaczyna się od sk-ant-).") }
                     }
                 }
-                Text(keyNote ?? (hasKey ? L("„Zrób zadania” w notatce pyta Claude (Haiku). Każde użycie to ułamek grosza.")
-                                 : L("Bez klucza notatka dzieli się po czasownikach. Klucz założysz na console.anthropic.com.")))
+                Text(keyNote ?? planNote)
                     .font(.system(size: 10.5)).foregroundStyle(keyNote == nil ? Color.secondary : Color.red)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -898,8 +931,29 @@ struct SettingsView: View {
         .onAppear { NSApp.activate(ignoringOtherApps: true) }
     }
 
+    /// Z czego korzystasz: PRO · Claude albo STANDARD · Apple Intelligence (albo bez AI).
+    private var planBadge: some View {
+        let pro = hasKey
+        return HStack(spacing: 5) {
+            Text(pro ? "PRO" : "STANDARD").font(.system(size: 9.5, weight: .heavy)).tracking(0.6)
+                .foregroundStyle(pro ? .white : Color.primary.opacity(0.7))
+                .padding(.horizontal, 6).padding(.vertical, 2)
+                .background(Capsule().fill(pro ? AnyShapeStyle(LinearGradient(colors: [Color(hex: 0x8B7CF6), Color(hex: 0xD9468F)],
+                                                                               startPoint: .leading, endPoint: .trailing))
+                                               : AnyShapeStyle(Color.primary.opacity(0.1))))
+            Text(pro ? "Claude" : AppleAI.available ? "Apple Intelligence" : L("bez AI"))
+                .font(.system(size: 12, weight: .medium))
+        }
+    }
+
+    private var planNote: String {
+        if hasKey { return L("„Zrób zadania” pyta Claude (Haiku): najlepiej rozumie chaotyczne notatki, także po polsku.") }
+        if AppleAI.available { return L("„Zrób zadania” liczy Apple Intelligence na tym Macu, prywatnie i bez internetu.") }
+        return L("Notatka dzieli się po czasownikach.") + " " + AppleAI.reason
+    }
+
     private func unlock() {
-        if ClaudeKey.unlock(password) { hasKey = true; keyNote = nil; password = "" }
+        if ClaudeKey.unlock(password) { hasKey = true; keyNote = nil; password = ""; proOpen = false }
         else { keyNote = L("Złe hasło.") }
     }
 
