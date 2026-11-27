@@ -524,21 +524,12 @@ struct DeadlineRow: View {
             }
             if note.deadline != nil {
                 let d = Binding(get: { note.deadline ?? Date() }, set: { note.deadline = $0 })
-                // w jednym rzędzie, a gdy się nie mieszczą (dłuższe napisy po angielsku): data w jednym, skróty w drugim
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 6) {
-                        DatePill(date: d, fg: fg)
-                        if note.hasTime { DatePill(date: d, time: true, fg: fg) }
-                        Spacer(minLength: 8)
-                        quick(L("Dziś"), 0); quick(L("Jutro"), 1); quick(L("+7 dni"), 7)
-                    }
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 6) {
-                            DatePill(date: d, fg: fg)
-                            if note.hasTime { DatePill(date: d, time: true, fg: fg) }
-                        }
-                        HStack(spacing: 6) { quick(L("Dziś"), 0); quick(L("Jutro"), 1); quick(L("+7 dni"), 7) }
-                    }
+                // jeden rząd: data, godzina i rozwijane „Szybko” (zamiast trzech przycisków)
+                HStack(spacing: 6) {
+                    DatePill(date: d, fg: fg)
+                    if note.hasTime { DatePill(date: d, time: true, fg: fg) }
+                    Spacer(minLength: 8)
+                    quickMenu
                 }
                 AlertsRow(note: $note, fg: fg)
             }
@@ -546,21 +537,39 @@ struct DeadlineRow: View {
         .foregroundStyle(fg)
     }
 
-    private func quick(_ t: String, _ days: Int) -> some View {
-        Button {
-            let cal = Calendar.current
-            var d = cal.date(byAdding: .day, value: days, to: cal.startOfDay(for: Date()))!
-            if note.hasTime, let old = note.deadline {
-                let c = cal.dateComponents([.hour, .minute], from: old)
-                d = cal.date(bySettingHour: c.hour ?? 9, minute: c.minute ?? 0, second: 0, of: d) ?? d
+    /// „Szybko ▾”: gotowe terminy w rozwijanej liście (godzina zostaje, jeśli była ustawiona).
+    private var quickMenu: some View {
+        Menu {
+            Button(L("Dziś")) { setDay(0) }
+            Button(L("Jutro")) { setDay(1) }
+            Button(L("Za tydzień")) { setDay(7) }
+            Button(L("Przyszły poniedziałek")) {
+                let cal = Calendar.current, wd = cal.component(.weekday, from: Date())   // 1 nd, 2 pn…
+                setDay((9 - wd) % 7 == 0 ? 7 : (9 - wd) % 7)
             }
-            note.deadline = d
         } label: {
-            Text(t).font(.system(size: 11, weight: .semibold)).lineLimit(1).fixedSize()
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(Capsule().fill(fg.opacity(0.1)))
+            HStack(spacing: 4) {
+                Text(L("Kiedy")).font(.system(size: 11.5, weight: .semibold))
+                Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold)).opacity(0.7)
+            }
+            .lineLimit(1).fixedSize()
+            .foregroundStyle(fg)
+            .padding(.horizontal, 10).padding(.vertical, 4)
+            .background(Capsule().fill(fg.opacity(0.1)))
+            .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+        .help(L("Gotowe terminy"))
+    }
+
+    private func setDay(_ days: Int) {
+        let cal = Calendar.current
+        var d = cal.date(byAdding: .day, value: days, to: cal.startOfDay(for: Date()))!
+        if note.hasTime, let old = note.deadline {
+            let c = cal.dateComponents([.hour, .minute], from: old)
+            d = cal.date(bySettingHour: c.hour ?? 9, minute: c.minute ?? 0, second: 0, of: d) ?? d
+        }
+        note.deadline = d
     }
 }
 
