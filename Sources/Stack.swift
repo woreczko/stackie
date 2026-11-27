@@ -1142,7 +1142,7 @@ struct TrashView: View {
                                     .overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(.black.opacity(0.1)))
                                     .frame(width: 6, height: 30)
                                 VStack(alignment: .leading, spacing: 1) {
-                                    Text(n.title.isEmpty ? L("Bez tytułu") : n.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                                    Text(n.shownTitle).font(.system(size: 13, weight: .semibold)).lineLimit(1)
                                     Text(LF("zostało %@", daysLabel(store.daysLeft(n)))
                                          + (n.client.isEmpty ? "" : " · " + n.client))
                                         .font(.system(size: 10.5)).foregroundStyle(Color.ink.opacity(0.5)).lineLimit(1)

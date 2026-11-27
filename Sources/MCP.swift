@@ -134,6 +134,7 @@ enum MCP {
     }
 
     static func describe(_ n: Note) -> String {
+        if n.locked { return "(locked note — the user keeps it private)\nid: \(n.id.uuidString)" }
         var head = n.title.isEmpty ? "(untitled)" : n.title
         let meta = [n.client, n.project].filter { !$0.isEmpty }.joined(separator: " / ")
         if !meta.isEmpty { head += " — " + meta }

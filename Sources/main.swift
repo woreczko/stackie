@@ -338,6 +338,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 
     func openEditor(_ id: UUID, at point: NSPoint? = nil, centered: Bool = false) {
+        // zablokowana: najpierw Touch ID
+        if store.notes.first(where: { $0.id == id })?.locked == true, !Locker.shared.isOpen(id) {
+            Locker.shared.unlock(id) { [weak self] ok in if ok { self?.openEditor(id, at: point, centered: centered) } }
+            return
+        }
+        if let prev = editorID, prev != id { Locker.shared.lock(prev) }
         let size = NSSize(width: 400, height: 640)
         if editor == nil {
             let p = Panel(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless],
@@ -530,6 +536,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     func closeEditor() {
         editor?.orderOut(nil)
+        if let id = editorID { Locker.shared.lock(id) }   // zablokowana zamyka się razem z edytorem
         editorID = nil
         store.save()
     }
@@ -592,7 +599,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             menu.addItem(.separator())
             menu.addItem(.sectionHeader(title: L("Zbliża się termin")))
             for n in due {
-                let it = item("\(n.title.isEmpty ? L("Bez tytułu") : n.title) · \(dueInfo(n)!.text)", #selector(menuOpen(_:)), "", "clock")
+                let it = item("\(n.shownTitle) · \(dueInfo(n)!.text)", #selector(menuOpen(_:)), "", "clock")
                 it.representedObject = n.id
                 menu.addItem(it)
             }
@@ -618,7 +625,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             let e = NSMenuItem(title: L("Pusto"), action: nil, keyEquivalent: ""); e.isEnabled = false; asub.addItem(e)
         }
         for n in store.archived.reversed() {
-            let it = item(LF("Przywróć: %@", n.title.isEmpty ? L("Bez tytułu") : n.title), #selector(menuRestore(_:)), "")
+            let it = item(LF("Przywróć: %@", n.shownTitle), #selector(menuRestore(_:)), "")
             it.representedObject = n.id
             asub.addItem(it)
         }
@@ -956,7 +963,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             w.orderFront(nil)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { shot(w, "21_przenies"); w.orderOut(nil) }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 14.4) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 13.7) {
+            // zablokowana karteczka (pełna i mała)
+            var n = Note(); n.title = "Hasła do kont"; n.color = 1; n.locked = true
+            n.tasks = [TaskItem(text: "tajne"), TaskItem(text: "też tajne")]
+            let v = HStack(alignment: .top, spacing: 20) {
+                CardView(note: .constant(n)); CardView(note: .constant(n), mini: true)
+            }.padding(20).environmentObject(self.store)
+            let w = NSWindow(contentRect: NSRect(x: 300, y: 100, width: 440, height: 310), styleMask: [.borderless], backing: .buffered, defer: false)
+            w.backgroundColor = NSColor(white: 0.5, alpha: 1)
+            w.contentView = NSHostingView(rootView: v)
+            w.orderFront(nil)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { shot(w, "22_zablokowana"); w.orderOut(nil) }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 15.2) {
             NSApp.terminate(nil)
         }
     }

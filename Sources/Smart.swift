@@ -26,6 +26,7 @@ enum ClaudeKey {
     private static var shared: String? { load().shared }
     private static func load() -> (own: String?, shared: String?) {
         if let cache { return cache }
+        if ProcessInfo.processInfo.environment["STOSIK_SNAP"] != nil { return (nil, nil) }   // testy: bez pęku kluczy
         let c = (read(ownAccount), read(sharedAccount)); cache = c; return c
     }
 

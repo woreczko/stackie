@@ -10,8 +10,14 @@ struct CardView: View {
         max(1, 4 - (note.tags.isEmpty ? 0 : 1) - (note.title.count > 17 ? 1 : 0) - (note.client.isEmpty && note.project.isEmpty ? 0 : 1))
     }
 
+    @ObservedObject private var locker = Locker.shared
+
     var body: some View {
-        if mini { miniCard } else { fullCard }
+        if note.locked && !locker.isOpen(note.id) {
+            let pal = palette(note.color)
+            Group { if mini { miniCard } else { fullCard } }
+                .overlay(LockCover(bg: pal.bg, fg: pal.dark ? .white : .ink, corner: mini ? 11 : 14, mini: mini))
+        } else if mini { miniCard } else { fullCard }
     }
 
     private var miniCard: some View {

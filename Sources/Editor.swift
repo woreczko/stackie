@@ -360,6 +360,19 @@ struct EditorView: View {
                     Label(L("Usuń"), systemImage: "trash").font(.system(size: 12, weight: .medium))
                 }
                 .buttonStyle(.plain).foregroundStyle(fg.opacity(0.6))
+                // Touch ID: zablokowana jest w stosie zasłonięta
+                Button {
+                    let on = !note.wrappedValue.locked
+                    if on { Locker.shared.keepOpen(id) }
+                    note.wrappedValue.locked = on
+                } label: {
+                    Image(systemName: note.wrappedValue.locked ? "lock.fill" : "lock.open")
+                        .font(.system(size: 12, weight: .medium)).frame(width: 20, height: 20).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain).foregroundStyle(fg.opacity(note.wrappedValue.locked ? 0.85 : 0.5))
+                .padding(.leading, 10)
+                .help(note.wrappedValue.locked ? L("Zablokowana: w stosie zasłonięta, otwiera się po Touch ID. Kliknij, żeby zdjąć blokadę.")
+                                               : L("Zablokuj Touch ID: w stosie będzie zasłonięta"))
                 Spacer()
                 Button {
                     store.setArchived(id, !note.wrappedValue.archived); close()
@@ -1122,7 +1135,7 @@ struct NotePicker: View {
     @State private var query = ""
     @FocusState private var focused: Bool
 
-    private func name(_ n: Note) -> String { n.title.isEmpty ? L("Bez tytułu") : n.title }
+    private func name(_ n: Note) -> String { n.shownTitle }
 
     private var groups: [(client: String, notes: [Note])] {
         let q = query.trimmingCharacters(in: .whitespaces)

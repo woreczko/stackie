@@ -61,8 +61,12 @@ struct Note: Codable, Identifiable, Equatable {
     var hopSnoozeUntil: Date? = nil
     var hopMutedFor: Date? = nil
     var files: [Attachment] = []
+    /// Pod Touch ID: w stosie zasłonięta, otwiera się po odblokowaniu.
+    var locked = false
 
     var remind: Bool { !alerts.isEmpty && deadline != nil }
+    /// Tytuł poza samą karteczką (kalendarz, menu, Na dziś): zablokowana się nie zdradza.
+    var shownTitle: String { locked ? L("Zablokowana") : (title.isEmpty ? L("Bez tytułu") : title) }
     var hopMuted: Bool { hopMutedFor != nil && hopMutedFor == deadline }
     var hopSnoozed: Bool { (hopSnoozeUntil ?? .distantPast) > Date() }
     /// Czy karteczka ma teraz podskakiwać (przypomnienie, bez drzemki i wyciszenia).
@@ -78,7 +82,7 @@ struct Note: Codable, Identifiable, Equatable {
 }
 
 extension Note {
-    enum K: String, CodingKey { case id, title, body, color, priority, deadline, hasTime, tasks, created, archived, archivedAt, tags, client, project, remind, alerts, deletedAt, hopSnoozeUntil, hopMutedFor, files }
+    enum K: String, CodingKey { case id, title, body, color, priority, deadline, hasTime, tasks, created, archived, archivedAt, tags, client, project, remind, alerts, deletedAt, hopSnoozeUntil, hopMutedFor, files, locked }
     init(from d: Decoder) throws {
         let c = try d.container(keyedBy: K.self)
         id = try c.decode(UUID.self, forKey: .id)
@@ -99,6 +103,7 @@ extension Note {
         hopSnoozeUntil = try c.decodeIfPresent(Date.self, forKey: .hopSnoozeUntil)
         hopMutedFor = try c.decodeIfPresent(Date.self, forKey: .hopMutedFor)
         files = try c.decodeIfPresent([Attachment].self, forKey: .files) ?? []
+        locked = try c.decodeIfPresent(Bool.self, forKey: .locked) ?? false
         alerts = try c.decodeIfPresent([Int].self, forKey: .alerts)
             ?? ((try c.decodeIfPresent(Bool.self, forKey: .remind)) == true ? [1440, 0] : [])
     }
@@ -130,7 +135,11 @@ struct NoteColor { let name: String; let bg: Color; let dark: Bool }
 enum Theme {
     /// 0 systemowy, 1 jasny, 2 ciemny
     static var mode: Int {
-        get { ProcessInfo.processInfo.environment["STOSIK_THEME"].map { $0 == "dark" ? 2 : 1 } ?? UserDefaults.standard.integer(forKey: "theme") }
+        get {
+            if let t = ProcessInfo.processInfo.environment["STOSIK_THEME"] { return t == "dark" ? 2 : 1 }
+            // domyślnie jasny (kolorowe karteczki); ciemny albo systemowy wybiera się w ustawieniach
+            return UserDefaults.standard.object(forKey: "theme") == nil ? 1 : UserDefaults.standard.integer(forKey: "theme")
+        }
         set { UserDefaults.standard.set(newValue, forKey: "theme"); refresh() }
     }
     /// Liczone raz na zmianę (czytane przy każdym rysowaniu karteczek).
@@ -470,7 +479,7 @@ final class Store: ObservableObject {
                 else { s = Seg(key: "", color: Color(hex: 0xB9B5AE), label: L("bez klienta")) }
             case .project:
                 if !n.project.isEmpty { s = Seg(key: "p:" + n.project.lowercased(), color: tagColor(n.project, kind: "p:"), label: n.project) }
-                else { s = Seg(key: n.id.uuidString, color: accent(n.color), label: n.title.isEmpty ? L("Bez tytułu") : n.title) }
+                else { s = Seg(key: n.id.uuidString, color: accent(n.color), label: n.shownTitle) }
             case .tag:
                 if let t = n.tags.first { s = Seg(key: t.lowercased(), color: tagColor(t), label: t) }
                 else { s = Seg(key: "", color: Color(hex: 0xB9B5AE), label: L("bez tagu")) }
@@ -642,7 +651,7 @@ extension Store {
         var out: [TodayGroup] = []
         for n in notes {
             guard let d = n.deadline, Calendar.current.isDate(d, inSameDayAs: now) else { continue }
-            let name = !n.client.isEmpty ? n.client : !n.project.isEmpty ? n.project : (n.title.isEmpty ? L("Bez tytułu") : n.title)
+            let name = !n.client.isEmpty ? n.client : !n.project.isEmpty ? n.project : n.shownTitle
             let key = (!n.client.isEmpty ? "c:" : !n.project.isEmpty ? "p:" : "t:") + name.lowercased()
             // karteczka bez zadań liczy się jako jedna rzecz do zrobienia
             let total = max(1, n.tasks.count), open = n.tasks.isEmpty ? 1 : n.tasks.count - n.doneCount
@@ -653,7 +662,7 @@ extension Store {
             out[i].open += open; out[i].total += total; out[i].notes.append(n.id)
             if !n.client.isEmpty {
                 // karteczka klienta bez projektu liczy się pod swoim tytułem
-                let pname = !n.project.isEmpty ? n.project : (n.title.isEmpty ? L("Bez tytułu") : n.title)
+                let pname = !n.project.isEmpty ? n.project : n.shownTitle
                 if let j = out[i].projects.firstIndex(where: { $0.name.lowercased() == pname.lowercased() }) {
                     out[i].projects[j].open += open
                 } else {

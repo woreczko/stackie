@@ -20,7 +20,7 @@ enum Spotlight {
         let index = CSSearchableIndex.default()
         var now: [String: String] = [:]
         var items: [CSSearchableItem] = []
-        for n in notes {
+        for n in notes where !n.locked {   // zablokowanych nie pokazujemy w Spotlight
             let id = n.id.uuidString, sig = signature(n)
             now[id] = sig
             if indexed?[id] != sig { items.append(item(n)) }
@@ -28,7 +28,7 @@ enum Spotlight {
         if indexed == nil {
             // pierwszy raz po starcie: czyścimy stary indeks (karteczki skasowane, gdy apka była zamknięta)
             index.deleteSearchableItems(withDomainIdentifiers: [domain]) { _ in
-                index.indexSearchableItems(notes.map(item)) { _ in }
+                index.indexSearchableItems(notes.filter { !$0.locked }.map(item)) { _ in }
             }
         } else {
             let gone = indexed!.keys.filter { now[$0] == nil }

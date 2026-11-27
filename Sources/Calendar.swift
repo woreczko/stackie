@@ -409,7 +409,7 @@ private struct Summary: View {
             HStack(spacing: 9) {
                 RoundedRectangle(cornerRadius: 3).fill(accent(n.color)).frame(width: 6, height: 26)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(n.title.isEmpty ? L("Bez tytułu") : n.title).font(.system(size: 12.5, weight: .semibold)).lineLimit(1)
+                    Text(n.shownTitle).font(.system(size: 12.5, weight: .semibold)).lineLimit(1)
                         .strikethrough(n.archived, color: .white.opacity(0.5))
                     Text(subtitle(n)).font(.system(size: 10)).opacity(0.5).lineLimit(1)
                 }
