@@ -6,6 +6,8 @@ struct QuickNoteView: View {
     var close: () -> Void
     /// Tekst na start (zrzuty do sprawdzania).
     var initial = ""
+    /// Ze skrótu klawiszowego: mikrofon włącza się od razu.
+    var dictate = false
     @ObservedObject private var dict = Dictation.shared
     @State private var text = ""
     @State private var busy = false
@@ -33,7 +35,11 @@ struct QuickNoteView: View {
         .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color(hex: 0xF7F1E7)))
         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(.black.opacity(0.1)))
         .foregroundStyle(Color.ink)
-        .onAppear { focused = true; if text.isEmpty { text = initial } }
+        .onAppear {
+            focused = true
+            if text.isEmpty { text = initial }
+            if dictate && !dict.recording { Dictation.shared.start() }
+        }
     }
 
     // MARK: pisanie i dyktowanie

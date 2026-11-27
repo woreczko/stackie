@@ -26,6 +26,9 @@ struct EditorView: View {
     @State private var sendCopy = false         // true: kopiuj, false: przenieś
     @State private var sentInfo: String?        // dymek „Przeniesiono do: …”
     @State private var sentToken = 0
+    @State private var aiBusy = false
+    @State private var aiUndo: String?          // tekst notatki sprzed zmiany AI (do cofnięcia)
+    @State private var aiError: String?
     private let rowGap: CGFloat = 8     // odstęp między wierszami zadań
 
     var body: some View {
@@ -263,6 +266,24 @@ struct EditorView: View {
                             .help(ClaudeKey.isSet ? L("Claude zamieni notatkę na zadania. Najpierw zobaczysz propozycję.")
                                                   : L("Podzieli notatkę na zadania po czasownikach. Z kluczem Claude (ustawienia) zrozumie też kontekst."))
                             .popover(isPresented: $smartShown, arrowEdge: .bottom) { smartView(note) }
+                            .padding(.trailing, 8)
+                            // poprawa, prostszy język, tłumaczenie, streszczenie (Pro albo Apple Intelligence)
+                            Menu {
+                                Button(L("Popraw pisownię")) { runRewrite(.fix) }
+                                Button(L("Uprość")) { runRewrite(.simplify) }
+                                Button(L("Przetłumacz (PL ↔ EN)")) { runRewrite(.translate) }
+                                Button(L("Streść w punktach")) { runRewrite(.summary) }
+                            } label: {
+                                Group {
+                                    if aiBusy { ProgressView().controlSize(.mini) }
+                                    else { Image(systemName: "wand.and.stars").font(.system(size: 11, weight: .semibold)) }
+                                }
+                                .foregroundStyle(fg.opacity(0.6)).frame(width: 18, height: 18).contentShape(Rectangle())
+                            }
+                            .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+                            .disabled(aiBusy || Smart.engine == .basic)
+                            .help(Smart.engine == .basic ? L("Popraw, uprość, przetłumacz, streść: w Pro (Claude)")
+                                                         : L("Popraw, uprość, przetłumacz, streść"))
                             .padding(.trailing, 10)
                         }
                         Button { pickFiles(id) } label: {
@@ -288,6 +309,26 @@ struct EditorView: View {
                         .scrollDisabled(true)
                         .frame(minHeight: 70)
                         .padding(.horizontal, -5)
+                    }
+                    if aiUndo != nil || aiError != nil {
+                        HStack(spacing: 8) {
+                            if let aiError {
+                                Text(aiError).font(.system(size: 11.5)).foregroundStyle(Color(hex: 0xC4281B)).lineLimit(2)
+                            } else {
+                                Image(systemName: "wand.and.stars").font(.system(size: 10, weight: .bold)).foregroundStyle(fg.opacity(0.5))
+                                Text(L("Zmienione przez AI")).font(.system(size: 11.5, weight: .medium)).foregroundStyle(fg.opacity(0.6))
+                            }
+                            Spacer()
+                            if let old = aiUndo {
+                                Button(L("Cofnij")) { note.wrappedValue.body = old; aiUndo = nil }
+                                    .buttonStyle(.plain).font(.system(size: 11.5, weight: .semibold)).foregroundStyle(fg)
+                                    .padding(.horizontal, 9).padding(.vertical, 3).background(Capsule().fill(fg.opacity(0.1)))
+                            }
+                            Button { aiUndo = nil; aiError = nil } label: {
+                                Image(systemName: "xmark").font(.system(size: 8, weight: .bold)).foregroundStyle(fg.opacity(0.5))
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                     FilesSection(id: id, fg: fg)
                     }
@@ -533,6 +574,24 @@ struct EditorView: View {
 
     private func removeTask(_ tid: UUID) {
         store.binding(id).wrappedValue.tasks.removeAll { $0.id == tid }
+    }
+
+    private func runRewrite(_ kind: Smart.Rewrite) {
+        let note = store.binding(id)
+        let before = note.wrappedValue.body
+        guard !before.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        aiBusy = true; aiError = nil
+        Smart.rewrite(before, kind) { r in
+            aiBusy = false
+            switch r {
+            case .success(let t):
+                // ktoś pisał w trakcie: nie nadpisujemy
+                guard note.wrappedValue.body == before else { return }
+                note.wrappedValue.body = t
+                aiUndo = before
+            case .failure(let e): aiError = e.localizedDescription
+            }
+        }
     }
 
     @ViewBuilder private func sendMenu(_ tid: UUID) -> some View {

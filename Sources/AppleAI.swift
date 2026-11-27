@@ -64,6 +64,24 @@ enum AppleAI {
     }
 }
 
+extension AppleAI {
+    /// Zwykła odpowiedź tekstowa (przyciski AI w notatce); nil przy błędzie.
+    static func rewrite(_ text: String, instructions: String, done: @escaping (String?) -> Void) {
+        #if canImport(FoundationModels)
+        if #available(macOS 26.0, *) {
+            Task {
+                do {
+                    let r = try await LanguageModelSession(instructions: instructions).respond(to: text)
+                    done(r.content.trimmingCharacters(in: .whitespacesAndNewlines))
+                } catch { done(nil) }
+            }
+            return
+        }
+        #endif
+        done(nil)
+    }
+}
+
 #if canImport(FoundationModels)
 @available(macOS 26.0, *)
 @Generable

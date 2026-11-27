@@ -118,6 +118,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         store.$notes.receive(on: RunLoop.main).sink { [weak self] _ in
             self?.resizeStack(); self?.updateStatusTitle()
         }.store(in: &bag)
+        // skrót w całym systemie: szybka notatka od razu z dyktowaniem (nie w testach ze zrzutami)
+        if ProcessInfo.processInfo.environment["STOSIK_SNAP"] == nil { Hotkey.install { [weak self] in self?.showQuickNote(dictate: true) } }
         // Spotlight: po chwili spokoju (nie przy każdej literze)
         store.$notes.debounce(for: .seconds(1.5), scheduler: RunLoop.main).sink { Spotlight.update($0) }.store(in: &bag)
         ui.$filterTag.combineLatest(ui.$query, ui.$filterClient, ui.$filterProject).receive(on: RunLoop.main).sink { [weak self] _ in
@@ -158,7 +160,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             exit(0)
         }
         // test zapytania do Claude (wypisuje wynik i kończy)
-        if let t = ProcessInfo.processInfo.environment["STOSIK_SMART_TEST"] {
+        if let t = ProcessInfo.processInfo.environment["STOSIK_REWRITE_TEST"] {
+            // test przycisków AI w notatce: każde z czterech poleceń po kolei
+            var left = Smart.Rewrite.allCases
+            func next() {
+                guard !left.isEmpty else { return NSApp.terminate(nil) }
+                let k = left.removeFirst()
+                Smart.rewrite(t, k) { r in
+                    switch r {
+                    case .success(let o): print("REWRITE \(k): \(o)")
+                    case .failure(let e): print("REWRITE \(k) fail:", e.localizedDescription)
+                    }
+                    next()
+                }
+            }
+            next()
+        } else if let t = ProcessInfo.processInfo.environment["STOSIK_SMART_TEST"] {
             print("ENGINE \(Smart.engine) apple=\(AppleAI.state)")
             Smart.propose(t) { r in
                 switch r {
@@ -277,7 +294,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     // MARK: edytor
 
     /// Szybka notatka z rogu ekranu: małe okienko na środku ekranu z kursorem (pisanie albo dyktowanie).
-    func showQuickNote() {
+    func showQuickNote(dictate: Bool = false) {
         // już otwarta: tylko na wierzch (nowy widok skasowałby wpisany tekst i dyktowanie)
         if let w = quickWin, w.isVisible, w.contentView != nil {
             NSApp.activate(ignoringOtherApps: true); w.makeKeyAndOrderFront(nil); return
@@ -291,7 +308,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         p.appearance = NSAppearance(named: .aqua)
         let host = NSHostingView(rootView: QuickNoteView(close: { [weak self] in
             self?.quickWin?.orderOut(nil); self?.quickWin?.contentView = nil
-        }))
+        }, dictate: dictate))
         host.sizingOptions = []
         p.contentView = host
         let m = NSEvent.mouseLocation

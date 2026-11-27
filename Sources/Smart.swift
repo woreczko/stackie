@@ -1,4 +1,5 @@
 import Foundation
+import NaturalLanguage
 import Security
 import CryptoKit
 import CommonCrypto
@@ -141,22 +142,39 @@ enum Smart {
             }
             return
         }
+        ask(key: key, system: systemPrompt(), user: text, schema: schema) { r in
+            switch r {
+            case .failure(let e): completion(.failure(e))
+            case .success(let txt):
+                guard let o = try? JSONSerialization.jsonObject(with: Data(txt.utf8)) as? [String: Any] else {
+                    return completion(.failure(.other(L("Claude odpowiedział w nieoczekiwany sposób."))))
+                }
+                completion(.success(proposal(from: o)))
+            }
+        }
+    }
+
+    /// Jedno pytanie do Claude; odpowiedź to tekst (z `schema`: JSON według schematu). Wynik na głównym wątku.
+    private static func ask(key: String, system: String, user: String, schema: [String: Any]?,
+                            completion: @escaping (Result<String, SmartError>) -> Void) {
         var req = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!)
         req.httpMethod = "POST"
         req.timeoutInterval = 60
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(key, forHTTPHeaderField: "x-api-key")
         req.setValue("2026-10-21", forHTTPHeaderField: "anthropic-version")
+        var output: [String: Any] = ["effort": "low"]
+        if let schema { output["format"] = ["type": "json_schema", "schema": schema] }
         let body: [String: Any] = [
             "model": model,
             "max_tokens": 4000,
-            "system": systemPrompt(),
-            "messages": [["role": "user", "content": text]],
-            "output_config": ["effort": "low", "format": ["type": "json_schema", "schema": schema]],
+            "system": system,
+            "messages": [["role": "user", "content": user]],
+            "output_config": output,
         ]
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
         URLSession.shared.dataTask(with: req) { data, resp, err in
-            let finish: (Result<SmartProposal, SmartError>) -> Void = { r in DispatchQueue.main.async { completion(r) } }
+            let finish: (Result<String, SmartError>) -> Void = { r in DispatchQueue.main.async { completion(r) } }
             if err != nil { return finish(.failure(.network)) }
             let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
             if code == 401 || code == 403 { return finish(.failure(.badKey)) }
@@ -168,14 +186,64 @@ enum Smart {
                 return finish(.failure(.other(msg)))
             }
             if (j["stop_reason"] as? String) == "refusal" { return finish(.failure(.refused)) }
-            // odpowiedź: blok tekstu z JSON-em według schematu (bloki myślenia pomijamy)
+            // blok tekstu (bloki myślenia pomijamy)
             let blocks = j["content"] as? [[String: Any]] ?? []
-            guard let txt = blocks.first(where: { $0["type"] as? String == "text" })?["text"] as? String,
-                  let o = try? JSONSerialization.jsonObject(with: Data(txt.utf8)) as? [String: Any] else {
+            guard let txt = blocks.first(where: { $0["type"] as? String == "text" })?["text"] as? String else {
                 return finish(.failure(.other(L("Claude odpowiedział w nieoczekiwany sposób."))))
             }
-            finish(.success(proposal(from: o)))
+            finish(.success(txt.trimmingCharacters(in: .whitespacesAndNewlines)))
         }.resume()
+    }
+
+    /// Przyciski AI w notatce: poprawa pisowni, prostszy język, tłumaczenie PL↔EN, streszczenie.
+    enum Rewrite: CaseIterable { case fix, simplify, translate, summary }
+
+    static func rewrite(_ text: String, _ kind: Rewrite, completion: @escaping (Result<String, SmartError>) -> Void) {
+        let rule: String
+        switch kind {
+        case .fix: rule = """
+            Fix spelling, grammar, punctuation and missing diacritics (for Polish: ą ć ę ł ń ó ś ź ż, and "ze" vs "że" by meaning). \
+            Keep the author's words, meaning, language, line breaks and lists; do not rephrase.
+            """
+        case .simplify: rule = "Rewrite in plain, simple words and short sentences. Keep every fact, date, amount and task. Keep the language."
+        case .translate:
+            // kierunek z rozpoznania języka w systemie (model sam się w tym mylił)
+            let r = NLLanguageRecognizer(); r.processString(text)
+            let toEnglish = r.dominantLanguage == .polish
+            rule = "Translate the text into \(toEnglish ? "English" : "Polish"). Keep line breaks and lists."
+        case .summary: rule = """
+            Summarize as short bullet points starting with "- ", one per separate matter, covering every matter in the text \
+            (usually 2-5). Keep dates, amounts and who. Use the text's language.
+            """
+        }
+        let system = """
+            You edit a note in a sticky-notes app. \(rule)
+            Names of people, clients and brands (e.g. Beata, Kamp, Figure, ELLE) stay exactly as written, even in lowercase; \
+            never replace them with common words. Put only the resulting text in "text".
+            """
+        if let key = ClaudeKey.value {
+            // odpowiedź w polu „text”: model nie dopisze komentarza ani nie powtórzy oryginału
+            let schema: [String: Any] = ["type": "object", "properties": ["text": ["type": "string"]],
+                                         "required": ["text"], "additionalProperties": false]
+            ask(key: key, system: system, user: text, schema: schema) { r in
+                completion(r.flatMap { txt in
+                    guard let o = try? JSONSerialization.jsonObject(with: Data(txt.utf8)) as? [String: Any],
+                          let t = o["text"] as? String, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                        return .failure(.other(L("Claude odpowiedział w nieoczekiwany sposób.")))
+                    }
+                    return .success(t.trimmingCharacters(in: .whitespacesAndNewlines))
+                })
+            }
+        } else if AppleAI.available {
+            AppleAI.rewrite(text, instructions: system) { out in
+                DispatchQueue.main.async {
+                    if let out, !out.isEmpty { completion(.success(out)) }
+                    else { completion(.failure(.other(L("Apple Intelligence nie dało rady. Spróbuj jeszcze raz.")))) }
+                }
+            }
+        } else {
+            completion(.failure(.other(L("Ta funkcja wymaga Pro (Claude) albo Apple Intelligence."))))
+        }
     }
 
     static func proposal(from o: [String: Any]) -> SmartProposal {

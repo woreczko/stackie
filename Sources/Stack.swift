@@ -712,6 +712,7 @@ struct StackRoot: View {
     var openEditor: (UUID) -> Void
     var newNote: () -> Void
     var openCalendar: () -> Void
+    @State private var dropping = false
 
     var body: some View {
         let notes = ui.visible(store.active)
@@ -725,7 +726,22 @@ struct StackRoot: View {
                     .scaleEffect(k, anchor: .topLeading)
                     .frame(width: g.size.width, height: g.size.height, alignment: .topLeading)
                     .compositingGroup()   // cały stos blednie razem, karteczki nie prześwitują przez siebie
-                    .opacity(awake ? 1 : ui.restOpacity)
+                    .opacity(awake || dropping ? 1 : ui.restOpacity)
+                    // tekst, link albo plik z innej aplikacji upuszczony na stos = nowa karteczka
+                    .onDrop(of: [.fileURL, .url, .plainText], isTargeted: $dropping) { items in
+                        DropToNote.make(items) { id in openEditor(id) }
+                        return true
+                    }
+                    .overlay(alignment: .topLeading) {
+                        if dropping {
+                            Label(L("Upuść, a zrobię z tego karteczkę"), systemImage: "plus.square.on.square")
+                                .font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
+                                .padding(.horizontal, 12).frame(height: 30)
+                                .background(Capsule().fill(Color.ink.opacity(0.85)))
+                                .padding(.leading, StackLayout.padX * k).padding(.top, 4)
+                                .allowsHitTesting(false)
+                        }
+                    }
                     .animation(.easeOut(duration: 0.25), value: awake)
                     .animation(.easeOut(duration: 0.12), value: ui.restOpacity)
                 Toolbar(count: notes.count, newNote: newNote)
@@ -808,6 +824,7 @@ struct SettingsView: View {
     @State private var keyNote: String?
     @State private var password = ""
     @State private var proOpen = false
+    @State private var hotkey = Hotkey.choice
     @State private var opacity = UIState.shared.restOpacity
     @State private var login = SMAppService.mainApp.status == .enabled
 
@@ -832,6 +849,10 @@ struct SettingsView: View {
             row(L("Szybka notatka z rogu ekranu")) {
                 CornerPicker(selection: $corner)
                     .onChange(of: corner) { _, v in AppDelegate.shared?.hotCorner = v }
+            }
+            row(L("Skrót: szybka notatka z dyktowaniem")) {
+                PillPicker(selection: $hotkey, options: [(L("Wyłącz"), 0), ("⌃⌥ " + L("Spacja"), 1), ("⌥⌘N", 2)])
+                    .onChange(of: hotkey) { _, v in Hotkey.choice = v }
             }
             row(L("Przezroczystość stosu")) {
                 HStack(spacing: 10) {
