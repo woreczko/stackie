@@ -42,3 +42,8 @@ Karteczki na ekranie Maca ułożone w stos (wersja 1.0, 27.11.2026). Po angielsk
 - Drzemka: dzwoneczek na karteczce w stosie = menu (odłóż 10/30 min, 1 godz., do jutra rano, wycisz do zmiany terminu, włącz). Dotyczy tylko podskakiwania; powiadomienia bez zmian. Podskok co 20 s.
 - Wydajność: mysz jest czytana zegarem 60 razy na sekundę, więc w UIState.mouse wartości @Published przypisuj tylko przy zmianie (inaczej cały stos przerysowuje się 60×/s; tak było do 27.11: 44% CPU w spoczynku, po poprawce ok. 1%). Gdy kursor jest daleko, pollMouse kończy od razu.
 - Bezpieczeństwo danych: jeśli karteczki.json nie da się odczytać, przed startem powstaje kopia karteczki-kopia-<data>.json w tym samym folderze.
+
+## Publikacja (podpis Apple i GitHub)
+- `./publikuj.sh` buduje apkę dla Apple Silicon i Intela, podpisuje certyfikatem „Developer ID Application” (hardened runtime, uprawnienia w Stosik.entitlements), wysyła do notaryzacji Apple, dokleja potwierdzenie i pakuje build/Stackie-<wersja>.zip. `--github` od razu tworzy wydanie na github.com/woreczko/stackie.
+- Jednorazowo: certyfikat Developer ID Application (Xcode → Settings → Accounts → Manage Certificates → + ) i profil notaryzacji `xcrun notarytool store-credentials stackie` (Apple ID, Team ID, hasło dla aplikacji z account.apple.com).
+- git push z tego Maca wymaga jednorazowo `gh auth setup-git`.
