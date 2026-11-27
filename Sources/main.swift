@@ -3,6 +3,7 @@ import SwiftUI
 import Combine
 import UserNotifications
 import ServiceManagement
+import CoreSpotlight
 
 final class Panel: NSPanel {
     override var canBecomeKey: Bool { true }
@@ -71,6 +72,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     static weak var shared: AppDelegate?
 
+    /// Wynik ze Spotlight: otwieramy tę karteczkę.
+    func application(_ application: NSApplication, continue userActivity: NSUserActivity,
+                     restorationHandler: @escaping ([any NSUserActivityRestoring]) -> Void) -> Bool {
+        guard userActivity.activityType == CSSearchableItemActionType,
+              let s = userActivity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
+              let id = UUID(uuidString: s), store.notes.contains(where: { $0.id == id }) else { return false }
+        NSApp.activate(ignoringOtherApps: true)
+        stack?.orderFrontRegardless()
+        openEditor(id, centered: true)
+        return true
+    }
+
     /// Ukryte menu „Edycja”: apka z paska menu nie ma zwykłego menu, a bez niego w polach tekstowych
     /// nie działają ⌘C, ⌘V, ⌘X, ⌘A, ⌘Z (skróty idą przez menu).
     private func installEditMenu() {
@@ -93,6 +106,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     func applicationDidFinishLaunching(_ n: Notification) {
         AppDelegate.shared = self
         Lang.resolve()
+        if ProcessInfo.processInfo.environment["STOSIK_SPOTLIGHT_CHECK"] != nil {
+            Spotlight.check { DispatchQueue.main.async { NSApp.terminate(nil) } }
+            return
+        }
         installEditMenu()
         if Reminders.enabled { UNUserNotificationCenter.current().delegate = self }
         Reminders.setup()
@@ -101,6 +118,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         store.$notes.receive(on: RunLoop.main).sink { [weak self] _ in
             self?.resizeStack(); self?.updateStatusTitle()
         }.store(in: &bag)
+        // Spotlight: po chwili spokoju (nie przy każdej literze)
+        store.$notes.debounce(for: .seconds(1.5), scheduler: RunLoop.main).sink { Spotlight.update($0) }.store(in: &bag)
         ui.$filterTag.combineLatest(ui.$query, ui.$filterClient, ui.$filterProject).receive(on: RunLoop.main).sink { [weak self] _ in
             DispatchQueue.main.async { self?.resizeStack() }
         }.store(in: &bag)

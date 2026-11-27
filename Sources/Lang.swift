@@ -166,6 +166,7 @@ let EN: [String: String] = [
     "Wysłać fakturę": "Send the invoice", "Zebrać paragony": "Collect receipts", "Na piątek": "For Friday",
     "Beata dzwoniła, reklama do ELLE na piątek!! logo od Kampa": "Beata called, ELLE ad for Friday!! logo from Kamp",
     "Przeniesiono do: %@": "Moved to: %@", "Skopiowano do: %@": "Copied to: %@",
+    "Archiwum": "Archive",
     "Na dziś": "Today", "Kiedy": "When", "Przenieś albo kopiuj na inną karteczkę": "Move or copy to another note", "Przenieś na inną karteczkę…": "Move to another note…", "Kopiuj na inną karteczkę…": "Copy to another note…", "Kopiuj zadanie do…": "Copy task to…", "Przenieś zadanie do…": "Move task to…", "Szukaj karteczki": "Search notes", "Nie ma takiej karteczki.": "No such note.", "Bez klienta": "No client", "Usuń zadanie": "Delete task", "Za tydzień": "In a week", "Przyszły poniedziałek": "Next Monday", "Gotowe terminy": "Preset due dates", "Edycja": "Edit", "Cofnij": "Undo", "Ponów": "Redo", "Wytnij": "Cut", "Kopiuj": "Copy", "Wklej": "Paste", "Zaznacz wszystko": "Select All", "Szybka notatka": "Quick note", "Stop": "Stop", "Zapisz na brudno": "Save as draft",
     "Co masz w głowie? Pisz albo dyktuj, na brudno. Potem zapiszesz albo zrobisz z tego zadania.": "What's on your mind? Type or dictate, messy is fine. Then save it or turn it into tasks.",
     "Sprawdź aktualizacje z palca: w ustawieniach pod zębatką albo w menu w pasku": "Check for updates any time: in the settings under the gear or in the menu bar menu",
