@@ -16,7 +16,8 @@ struct EditorView: View {
     @State private var rowH: [UUID: CGFloat] = [:]   // wysokości wierszy (długie zadania zawijają się w kilka linii)
     @State private var liftTask: UUID?
     @State private var dropping = false
-    @State private var tasksH: CGFloat = 0   // wysokość listy zadań (do ustawienia „Dodaj zadanie” i notatki)
+    @State private var tasksH: CGFloat = 0
+    @State private var noteOpen = false   // schowana notatka otwarta przyciskiem „Notatka”   // wysokość listy zadań (do ustawienia „Dodaj zadanie” i notatki)
     @State private var smartBusy = false
     @State private var lastSubmit = Date.distantPast   // Enter: nowe zadanie tylko raz (onSubmit albo nowa linia)
     @State private var smartShown = false
@@ -104,15 +105,12 @@ struct EditorView: View {
 
             Divider().overlay(fg.opacity(0.15)).padding(.vertical, 12)
 
-            // Zadania: „Dodaj zadanie” stoi tuż pod listą i zjeżdża z nią w dół, aż oprze się o dół okna;
-            // wtedy lista przewija się nad nim, a notatka się chowa.
-            GeometryReader { geo in
-                let headerH: CGFloat = 24, addH: CGFloat = 34
-                // zadania mieszczą się: całość przewija się jak dawniej (notatka pod spodem);
-                // nie mieszczą się: „Dodaj zadanie” przy dolnej krawędzi, notatka schowana
-                let showNote = tasksH + headerH + addH <= geo.size.height
-                let listH = max(0, min(tasksH, geo.size.height - headerH - addH))
-                VStack(alignment: .leading, spacing: 0) {
+            // Zadania jak lista z przyklejoną stopką: „Dodaj zadanie / Dyktuj” trzyma się dołu okna, gdy zadań jest dużo,
+            // a po przewinięciu do końca wraca pod listę i pokazuje się notatka.
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 8, pinnedViews: [.sectionFooters]) {
+                        Section {
             HStack {
                 Text(L("Zadania")).font(.system(size: 11, weight: .bold)).tracking(0.8).textCase(.uppercase)
                     .foregroundStyle(fg.opacity(0.6))
@@ -122,12 +120,6 @@ struct EditorView: View {
                         .font(.system(size: 11, weight: .semibold).monospacedDigit()).foregroundStyle(fg.opacity(0.6))
                 }
             }
-                    .frame(height: headerH, alignment: .top)
-                    ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 8) {
                     ForEach(note.tasks) { $t in
                         let dragging = dragTask == t.id
                         HStack(alignment: .top, spacing: 9) {
@@ -203,16 +195,7 @@ struct EditorView: View {
                         .transaction { if dragging && !$0[LiftKey.self] { $0.animation = nil } }
                         .onHover { h in hoverTask = h ? t.id : (hoverTask == t.id ? nil : hoverTask) }
                     }
-                            }
-                            .padding(.trailing, 6)
-                            .background(GeometryReader { g in Color.clear.preference(key: TasksHeight.self, value: g.size.height) })
-                        }
-                        .scrollIndicators(.never)
-                        .frame(height: listH)
-                        .onChange(of: focus) { _, f in
-                            if let f { withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(f, anchor: .center) } }
-                        }
-                    }
+                        } footer: {
             HStack(spacing: 16) {
                 Button { insertTask(after: nil) } label: {
                     HStack(spacing: 9) {
@@ -231,9 +214,10 @@ struct EditorView: View {
                 }
                 .buttonStyle(.plain).help(L("Mów, co jest do zrobienia. Każde zdanie to osobne zadanie."))
             }
-                    .frame(height: addH, alignment: .center)
-                    if showNote {
-                        VStack(alignment: .leading, spacing: 8) {
+                            .frame(height: 34)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(pal.bg)
+                        }
                     HStack {
                         Text(L("Notatka")).font(.system(size: 11, weight: .bold)).tracking(0.8).textCase(.uppercase)
                             .foregroundStyle(fg.opacity(0.6))
@@ -278,17 +262,14 @@ struct EditorView: View {
                         .padding(.horizontal, -5)
                     }
                     FilesSection(id: id, fg: fg)
-                        }
-                        .padding(.trailing, 6)
                     }
-                    }
-                    }
-                    .scrollIndicators(.never)
-                    .scrollDisabled(!showNote)
-                    Spacer(minLength: 0)
+                    .padding(.trailing, 6)
+                }
+                .scrollIndicators(.never)
+                .onChange(of: focus) { _, f in
+                    if let f { withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(f, anchor: .center) } }
                 }
             }
-            .onPreferenceChange(TasksHeight.self) { tasksH = $0 }
 
             HStack {
                 Button { close(); store.delete(id) } label: {
@@ -961,8 +942,3 @@ struct DatePill: View {
 
 
 
-/// Wysokość listy zadań w edytorze.
-private struct TasksHeight: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
-}
