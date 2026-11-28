@@ -74,8 +74,7 @@ struct CardView: View {
         .frame(width: 150, height: 116, alignment: .topLeading)
         .background(
             RoundedRectangle(cornerRadius: 11, style: .continuous).fill(pal.bg)
-                .overlay(alignment: .top) { if let t = pal.tint { Rectangle().fill(t).frame(height: 2.5) } }
-                .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                .overlay { if let t = pal.tint { TopRim(color: t, corner: 11, width: 2, fade: 22) } }
                 .shadow(color: .black.opacity(lifted ? 0.28 : 0.16), radius: lifted ? 14 : 6, x: 0, y: lifted ? 8 : 3)
         )
         .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).strokeBorder(.black.opacity(0.07), lineWidth: 1))
@@ -199,11 +198,10 @@ struct CardView: View {
         .background(
             // cień tylko pod samą kartką, nie pod tekstem i tagami
 RoundedRectangle(cornerRadius: 14, style: .continuous).fill(pal.bg)
-                .overlay(alignment: .top) {
-                    // ciemny wygląd: kolor karteczki jako cienki brzeg u góry (daleko od ikon)
-                    if let t = pal.tint { Rectangle().fill(t).frame(height: 3) }
+                .overlay {
+                    // ciemny wygląd: kolor karteczki jako obwódka u góry, po łuku rogów, gasnąca w dół boków
+                    if let t = pal.tint { TopRim(color: t, corner: 14, width: 2.5, fade: 30) }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .shadow(color: .black.opacity(lifted ? 0.28 : 0.16), radius: lifted ? 16 : 7, x: 0, y: lifted ? 10 : 3)
         )
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.black.opacity(0.07), lineWidth: 1))
@@ -500,5 +498,26 @@ struct TodayCard: View {
                 .shadow(color: .black.opacity(lifted ? 0.28 : 0.16), radius: lifted ? 16 : 7, x: 0, y: lifted ? 10 : 3)
         )
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.black.opacity(0.07), lineWidth: 1))
+    }
+}
+
+
+/// Kolorowa obwódka górnej krawędzi karteczki: idzie po zaokrągleniach i gaśnie na bokach po `fade` punktach.
+struct TopRim: View {
+    var color: Color
+    var corner: CGFloat
+    var width: CGFloat
+    var fade: CGFloat
+    var body: some View {
+        GeometryReader { g in
+            let h = max(1, g.size.height)
+            RoundedRectangle(cornerRadius: corner, style: .continuous)
+                .strokeBorder(color, lineWidth: width)
+                .mask(LinearGradient(stops: [.init(color: .black, location: 0),
+                                             .init(color: .black, location: corner * 0.6 / h),
+                                             .init(color: .clear, location: fade / h)],
+                                     startPoint: .top, endPoint: .bottom))
+        }
+        .allowsHitTesting(false)
     }
 }
