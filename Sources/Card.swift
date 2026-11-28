@@ -74,6 +74,8 @@ struct CardView: View {
         .frame(width: 150, height: 116, alignment: .topLeading)
         .background(
             RoundedRectangle(cornerRadius: 11, style: .continuous).fill(pal.bg)
+                .overlay(alignment: .top) { if let t = pal.tint { Rectangle().fill(t).frame(height: 2.5) } }
+                .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
                 .shadow(color: .black.opacity(lifted ? 0.28 : 0.16), radius: lifted ? 14 : 6, x: 0, y: lifted ? 8 : 3)
         )
         .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).strokeBorder(.black.opacity(0.07), lineWidth: 1))
@@ -197,11 +199,12 @@ struct CardView: View {
         .background(
             // cień tylko pod samą kartką, nie pod tekstem i tagami
 RoundedRectangle(cornerRadius: 14, style: .continuous).fill(pal.bg)
-                .shadow(color: .black.opacity(lifted ? 0.28 : 0.16), radius: lifted ? 16 : 7, x: 0, y: lifted ? 10 : 3)
-                .overlay(alignment: .topLeading) {
-                    // ciemny wygląd: kolor karteczki jako kreska u góry
-                    if let t = pal.tint { Capsule().fill(t).frame(width: 34, height: 4).padding(.leading, 16).padding(.top, 7) }
+                .overlay(alignment: .top) {
+                    // ciemny wygląd: kolor karteczki jako cienki brzeg u góry (daleko od ikon)
+                    if let t = pal.tint { Rectangle().fill(t).frame(height: 3) }
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .shadow(color: .black.opacity(lifted ? 0.28 : 0.16), radius: lifted ? 16 : 7, x: 0, y: lifted ? 10 : 3)
         )
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.black.opacity(0.07), lineWidth: 1))
     }
