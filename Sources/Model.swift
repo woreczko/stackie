@@ -651,6 +651,8 @@ struct TodayGroup: Identifiable {
     var notes: [UUID] = []
     /// Coś z tej grupy jest po terminie (z poprzednich dni, nieskończone).
     var overdue = false
+    /// Najstarszy zaległy termin w grupie (do podpisu „zaległe od …”).
+    var lateSince: Date?
     /// Projekty klienta i ile w każdym zostało (pod nazwą klienta, gdy jest ich więcej niż jeden).
     var projects: [(name: String, open: Int)] = []
 }
@@ -673,7 +675,7 @@ extension Store {
             }
             let i = out.firstIndex { $0.key == key }!
             out[i].open += open; out[i].total += total; out[i].notes.append(n.id)
-            if late { out[i].overdue = true }
+            if late { out[i].overdue = true; out[i].lateSince = min(out[i].lateSince ?? d, d) }
             if !n.client.isEmpty {
                 // karteczka klienta bez projektu liczy się pod swoim tytułem
                 let pname = !n.project.isEmpty ? n.project : n.shownTitle

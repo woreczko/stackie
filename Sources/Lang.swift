@@ -167,6 +167,7 @@ let EN: [String: String] = [
     "Beata dzwoniła, reklama do ELLE na piątek!! logo od Kampa": "Beata called, ELLE ad for Friday!! logo from Kamp",
     "Przeniesiono do: %@": "Moved to: %@", "Skopiowano do: %@": "Copied to: %@",
     "Archiwum": "Archive",
+    "zaległe od %@": "overdue since %@",
     "Zablokowana": "Locked", "otworzyć zablokowaną karteczkę": "open a locked note",
     "Zablokowana: w stosie zasłonięta, otwiera się po Touch ID. Kliknij, żeby zdjąć blokadę.": "Locked: covered in the stack, opens with Touch ID. Click to remove the lock.",
     "Zablokuj Touch ID: w stosie będzie zasłonięta": "Lock with Touch ID: it will be covered in the stack",

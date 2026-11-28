@@ -444,6 +444,11 @@ struct TodayCard: View {
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(g.name).font(.system(size: 12.5, weight: .semibold)).lineLimit(1)
                                     .strikethrough(g.open == 0, color: fg.opacity(0.5))
+                                if g.overdue, g.open > 0, let d = g.lateSince {
+                                    Text(LF("zaległe od %@", d.formatted(.dateTime.day().month(.abbreviated).locale(Lang.locale))))
+                                        .font(.system(size: 10.5, weight: .semibold)).lineLimit(1)
+                                        .foregroundStyle(Color(hex: 0xE5533D))
+                                }
                                 if g.projects.count > 1 {
                                     Text(g.projects.map { "\($0.name) \($0.open)" }.joined(separator: " · "))
                                         .font(.system(size: 10.5, weight: .medium)).lineLimit(1)
