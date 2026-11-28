@@ -1,8 +1,8 @@
 import SwiftUI
 
 let CAL_BG = Color(hex: 0x1F1E23)
-var CAL_GREY: Color { Theme.dark ? Color(hex: 0x44434A) : Color(hex: 0xD3D1CD) }
-var CAL_PAPER: Color { Theme.dark ? Color(hex: 0x26252B) : Color(hex: 0xF7F1E7) }
+var CAL_GREY: Color { Theme.dark ? Color(hex: 0x2A2A2E) : Color(hex: 0xD3D1CD) }
+var CAL_PAPER: Color { Theme.dark ? Color(hex: 0x1B1B1E) : Color(hex: 0xF7F1E7) }
 /// Jasny papier okienka powitalnego (bez zmiany w ciemnym wyglądzie).
 let PAPER_FIXED = Color(hex: 0xF7F1E7)
 

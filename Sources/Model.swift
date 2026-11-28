@@ -129,7 +129,11 @@ func cleanTag(_ s: String) -> String {
 enum CalMode: String { case client, project, tag }
 struct Seg: Hashable { let key: String; let color: Color; let label: String }
 
-struct NoteColor { let name: String; let bg: Color; let dark: Bool }
+struct NoteColor {
+    let name: String; let bg: Color; let dark: Bool
+    /// Ciemny wygląd: kolor karteczki jako akcent (pasek, kółka, kreska u góry); w jasnym nil.
+    var tint: Color? = nil
+}
 
 /// Wygląd: systemowy, jasny albo ciemny (ciemne karteczki w kolorze, jasny tekst).
 enum Theme {
@@ -162,7 +166,7 @@ extension Color {
     /// Tekst na wypełnieniu w kolorze `ink` (np. czarny przycisk z białym napisem).
     static var onInk: Color { Theme.dark ? Color(hex: 0x1E1D22) : .white }
     /// Biała kartka „Na dziś” (w ciemnym wyglądzie grafitowa).
-    static var paperWhite: Color { Theme.dark ? Color(hex: 0x3A393F) : .white }
+    static var paperWhite: Color { Theme.dark ? Color(hex: DARK_CARD) : .white }
 }
 
 let PALETTE: [NoteColor] = [
@@ -178,15 +182,19 @@ let PALETTE: [NoteColor] = [
     NoteColor(name: "Grafit", bg: Color(hex: 0x2D2C31), dark: true),
 ]
 
-/// Ten sam kolor w ciemnym wyglądzie: przygaszony odcień z jasnym tekstem.
-let DARK_PALETTE: [UInt32] = [0x3D3933, 0x58364A, 0x5C3624, 0x55492A, 0x434E27, 0x2A4C40, 0x284A5C, 0x3D3763, 0x612B23, 0x1C1B20]
+/// Ciemny wygląd: wszystkie karteczki w jednym grafitowym kolorze, kolor karteczki tylko jako akcent.
+let DARK_CARD: UInt32 = 0x202023
 
 /// Jasny kolor karteczki do kropek, pasków i pierścieni (także w ciemnym wyglądzie, żeby było je widać).
 func accent(_ i: Int) -> Color { PALETTE[max(0, min(PALETTE.count - 1, i))].bg }
 
 func palette(_ i: Int) -> NoteColor {
     let k = max(0, min(PALETTE.count - 1, i))
-    if Theme.dark { return NoteColor(name: PALETTE[k].name, bg: Color(hex: DARK_PALETTE[k]), dark: true) }
+    if Theme.dark {
+        // grafitowa karteczka ma akcent w jasnej szarości (inaczej by zniknął)
+        let tint = k == PALETTE.count - 1 ? Color(hex: 0xA3A3AB) : PALETTE[k].bg
+        return NoteColor(name: PALETTE[k].name, bg: Color(hex: DARK_CARD), dark: true, tint: tint)
+    }
     return PALETTE[k]
 }
 

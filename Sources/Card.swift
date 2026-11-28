@@ -59,7 +59,7 @@ struct CardView: View {
                     GeometryReader { g in
                         ZStack(alignment: .leading) {
                             Capsule().fill(fg.opacity(0.14))
-                            Capsule().fill(fg.opacity(0.8))
+                            Capsule().fill(pal.tint ?? fg.opacity(0.8))
                                 .frame(width: g.size.width * CGFloat(note.doneCount) / CGFloat(max(1, note.tasks.count)))
                         }
                     }
@@ -132,7 +132,7 @@ struct CardView: View {
                                 // ⌥-klik: „w trakcie”; zwykły klik: zrobione
                                 if NSEvent.modifierFlags.contains(.option) && !t.done { note.tasks[i].doing.toggle() }
                                 else { note.tasks[i].done.toggle() }
-                            } label: { CheckCircle(done: t.done, color: fg, size: 15, doing: t.doing) }
+                            } label: { CheckCircle(done: t.done, color: pal.tint ?? fg, size: 15, doing: t.doing) }
                                 .buttonStyle(.plain)
                             Text(t.text.isEmpty ? "…" : t.text)
                                 .font(.system(size: 12.5))
@@ -181,7 +181,7 @@ struct CardView: View {
                     GeometryReader { g in
                         ZStack(alignment: .leading) {
                             Capsule().fill(fg.opacity(0.14))
-                            Capsule().fill(fg.opacity(0.8))
+                            Capsule().fill(pal.tint ?? fg.opacity(0.8))
                                 .frame(width: g.size.width * CGFloat(note.doneCount) / CGFloat(max(1, note.tasks.count)))
                         }
                     }
@@ -196,8 +196,12 @@ struct CardView: View {
         .frame(width: StackLayout.fullW, height: StackLayout.fullH, alignment: .topLeading)
         .background(
             // cień tylko pod samą kartką, nie pod tekstem i tagami
-            RoundedRectangle(cornerRadius: 14, style: .continuous).fill(pal.bg)
+RoundedRectangle(cornerRadius: 14, style: .continuous).fill(pal.bg)
                 .shadow(color: .black.opacity(lifted ? 0.28 : 0.16), radius: lifted ? 16 : 7, x: 0, y: lifted ? 10 : 3)
+                .overlay(alignment: .topLeading) {
+                    // ciemny wygląd: kolor karteczki jako kreska u góry
+                    if let t = pal.tint { Capsule().fill(t).frame(width: 34, height: 4).padding(.leading, 16).padding(.top, 7) }
+                }
         )
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.black.opacity(0.07), lineWidth: 1))
     }

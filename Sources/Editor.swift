@@ -78,7 +78,8 @@ struct EditorView: View {
 
             // Kolory
             HStack(spacing: 7) {
-                ForEach(PALETTE.indices, id: \.self) { i in
+                // w ciemnym wyglądzie bez grafitu (wszystkie karteczki są tam grafitowe)
+                ForEach(Theme.dark ? Array(PALETTE.indices.dropLast()) : Array(PALETTE.indices), id: \.self) { i in
                     Button { note.wrappedValue.color = i } label: {
                         Circle().fill(PALETTE[i].bg)
                             .overlay(Circle().strokeBorder(.black.opacity(0.18), lineWidth: 1))
@@ -138,7 +139,7 @@ struct EditorView: View {
                                 .help(L("Przeciągnij, żeby zmienić kolejność"))
                             Button {
                                 if NSEvent.modifierFlags.contains(.option) && !t.done { t.doing.toggle() } else { t.done.toggle() }
-                            } label: { CheckCircle(done: t.done, color: fg, size: 18, doing: t.doing) }
+                            } label: { CheckCircle(done: t.done, color: pal.tint ?? fg, size: 18, doing: t.doing) }
                                 .help(L("Kliknij: zrobione. ⌥ i kliknij: w trakcie."))
                                 .buttonStyle(.plain).padding(.top, 4)
                             // w edytorze całe zadanie, zawinięte; na karteczce zostaje jedna linia
