@@ -167,6 +167,8 @@ let EN: [String: String] = [
     "Beata dzwoniła, reklama do ELLE na piątek!! logo od Kampa": "Beata called, ELLE ad for Friday!! logo from Kamp",
     "Przeniesiono do: %@": "Moved to: %@", "Skopiowano do: %@": "Copied to: %@",
     "Archiwum": "Archive",
+    "Pn": "Mo", "Wt": "Tu", "Śr": "We", "Cz": "Th", "Pt": "Fr", "Sb": "Sa", "Nd": "Su",
+    "Szara karta na końcu stosu to kalendarz. Zielony ptaszek to dzień zamknięty, czerwony znak to coś zaległego. Obok paski: co zrobione i dla kogo najwięcej.": "The grey card at the end of the stack is the calendar. A green tick means the day is closed, a red mark means something is overdue. Next to it, bars: what's done and who gets the most.",
     "Wszystko z terminem tego dnia zrobione": "Everything due that day is done", "Termin minął, coś zostało": "Past due, something is left", "Termin tego dnia": "Something is due that day",
     "STATUS ZADAŃ": "TASK STATUS", "zamknięte": "done", "w trakcie": "in progress", "nieruszone": "not started",
     "DLA KOGO NAJWIĘCEJ": "WHO GETS THE MOST", "Wszystkie": "All", "Pozostałe": "Other",

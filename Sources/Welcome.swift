@@ -38,7 +38,7 @@ struct WelcomeView: View {
             WelcomePage(title: L("Projekty i zadania"), text: L("Jedna karteczka to jeden projekt. Odhaczasz kółeczka, a pasek pokazuje postęp. Zadania przesuwasz za uchwyt."), demo: AnyView(DemoTasks())),
             WelcomePage(title: L("Terminy i przypomnienia"), text: L("Data w rogu, pilność w kolorach. Dzwoneczek ustawia przypomnienia, a karteczka podskakuje, gdy termin jest blisko."), demo: AnyView(DemoReminder())),
             WelcomePage(title: L("Klienci, projekty i tagi"), text: L("Każda karteczka może mieć klienta, projekt i tagi. Kliknij jeden z nich, żeby zostawić w stosie tylko to, co do niego pasuje."), demo: AnyView(DemoFilter())),
-            WelcomePage(title: L("Kalendarz i podsumowanie"), text: L("Szara karta na końcu stosu to kalendarz. Kółka dni pokazują, co się działo, a wykres, ile zostało."), demo: AnyView(DemoCalendar())),
+            WelcomePage(title: L("Kalendarz i podsumowanie"), text: L("Szara karta na końcu stosu to kalendarz. Zielony ptaszek to dzień zamknięty, czerwony znak to coś zaległego. Obok paski: co zrobione i dla kogo najwięcej."), demo: AnyView(DemoCalendar())),
             WelcomePage(title: L("Pliki przy karteczce"), text: L("Przeciągnij PDF, zdjęcie albo inny plik na otwartą karteczkę. Stosik trzyma kopię, więc nic nie zginie."), demo: AnyView(DemoFiles())),
             WelcomePage(title: L("Kosz na 30 dni"), text: L("Pociągnij karteczkę w dół, aż kosz zrobi się czerwony. Przez 30 dni możesz ją przywrócić."), demo: AnyView(DemoTrash())),
             WelcomePage(title: L("Dyktowanie"), text: L("Kliknij mikrofon i powiedz, co jest do zrobienia. Każdy czasownik zaczyna nowe zadanie, a „klient”, „projekt” i „tag” wypełniają pola."), demo: AnyView(DemoDictation())),
@@ -368,40 +368,57 @@ struct DemoFilter: View {
 }
 
 struct DemoCalendar: View {
+    // tydzień: 0 zrobione, 1 zaległe, 2 otwarte, 3 nic; czwartek to „dziś”
+    private let week: [(String, Int, Int)] = [("Pn", 23, 0), ("Wt", 24, 0), ("Śr", 25, 1), ("Cz", 26, 2), ("Pt", 27, 2), ("Sb", 28, 3), ("Nd", 29, 3)]
     var body: some View {
-        Loop(period: 4) { t in
-            let p = ease(t, 0.05, 0.6)
-            let segs: [[Color]] = [[accent(5)], [accent(5), accent(7)], [], [accent(2), accent(5), accent(7)],
-                                   [accent(7)], [], [accent(2)], [accent(5), accent(2)], [], [accent(7)],
-                                   [accent(5)], [accent(2), accent(7)], [], [accent(5)]]
-            HStack(spacing: 30) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(monthName(Calendar.current.component(.month, from: Date()))).font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
-                    LazyVGrid(columns: Array(repeating: GridItem(.fixed(30), spacing: 6), count: 7), spacing: 6) {
-                        ForEach(0..<14, id: \.self) { i in
+        Loop(period: 5) { t in
+            let p = ease(t, 0.35, 0.75)
+            HStack(alignment: .center, spacing: 26) {
+                HStack(spacing: 6) {
+                    ForEach(Array(week.enumerated()), id: \.offset) { i, d in
+                        // ptaszki wskakują po kolei
+                        let on = t > 0.08 + Double(i) * 0.06
+                        VStack(spacing: 5) {
+                            Text(L(d.0)).font(.system(size: 9, weight: .semibold)).foregroundStyle(.white.opacity(0.55))
+                            Text("\(d.1)").font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
                             ZStack {
-                                Circle().fill(i == 9 ? PriorityIcon.purple : .white.opacity(0.08)).padding(4)
-                                let n = Double(segs[i].count)
-                                ForEach(Array(segs[i].enumerated()), id: \.offset) { k, c in
-                                    let a = Double(k) / n, b = Double(k + 1) / n - (n > 1 ? 0.05 : 0)
-                                    Circle().trim(from: a, to: a + (b - a) * p).stroke(c, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                                        .rotationEffect(.degrees(-90)).padding(1.5)
+                                if d.2 == 0 {
+                                    Circle().fill(DAY_DONE)
+                                    Image(systemName: "checkmark").font(.system(size: 7, weight: .heavy)).foregroundStyle(Color.inkFixed)
+                                } else if d.2 == 1 {
+                                    Circle().fill(DAY_LATE)
+                                    Image(systemName: "exclamationmark").font(.system(size: 7, weight: .heavy)).foregroundStyle(.white)
+                                } else if d.2 == 2 {
+                                    Circle().fill(.white.opacity(0.25))
                                 }
-                                Text("\(i + 10)").font(.system(size: 10, weight: .medium)).foregroundStyle(.white.opacity(0.85))
                             }
-                            .frame(width: 30, height: 30)
+                            .frame(width: 15, height: 15)
+                            .scaleEffect(on ? 1 : 0.3).opacity(on ? 1 : 0)
                         }
+                        .frame(width: 34, height: 66)
+                        .background(RoundedRectangle(cornerRadius: 13, style: .continuous).fill(.white.opacity(0.08)))
+                        .overlay { if i == 3 { RoundedRectangle(cornerRadius: 13, style: .continuous).strokeBorder(.white, lineWidth: 1.5) } }
                     }
                 }
-                ZStack {
-                    Circle().stroke(.white.opacity(0.13), lineWidth: 12)
-                    Circle().trim(from: 0, to: 0.68 * p).stroke(Color(hex: 0x9BE08F), style: StrokeStyle(lineWidth: 12, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                    Text("\(Int(68 * p))%").font(.system(size: 18, weight: .semibold)).foregroundStyle(.white).monospacedDigit()
+                VStack(alignment: .leading, spacing: 12) {
+                    bar([(DAY_DONE, 6 * p + 1), (Color(hex: 0xA597F3), 2), (.white.opacity(0.22), 6 - 5 * p)])
+                    bar([(accent(5), 5), (accent(7), 3 * p + 1), (accent(2), 2), (accent(3), 1)])
                 }
-                .frame(width: 96, height: 96)
+                .frame(width: 150)
             }
         }
+    }
+
+    private func bar(_ parts: [(Color, Double)]) -> some View {
+        GeometryReader { g in
+            let total = parts.reduce(0) { $0 + $1.1 }
+            HStack(spacing: 2) {
+                ForEach(Array(parts.enumerated()), id: \.offset) { _, x in
+                    RoundedRectangle(cornerRadius: 4).fill(x.0).frame(width: max(3, (g.size.width - 6) * x.1 / total))
+                }
+            }
+        }
+        .frame(height: 16)
     }
 }
 
