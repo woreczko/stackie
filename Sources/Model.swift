@@ -500,6 +500,15 @@ final class Store: ObservableObject {
     func closedOn(_ day: Date) -> Bool {
         archived.contains { $0.archivedAt.map { Calendar.current.isDate($0, inSameDayAs: day) } ?? false }
     }
+    enum DayStatus { case none, open, overdue, done }
+    /// Jak poszedł dzień: wszystko z terminem tego dnia zrobione, zaległe, jeszcze otwarte albo nic.
+    func dayStatus(_ day: Date) -> DayStatus {
+        let due = notes.filter { $0.deadline.map { Calendar.current.isDate($0, inSameDayAs: day) } ?? false }
+        guard !due.isEmpty else { return .none }
+        if due.allSatisfy({ $0.archived || $0.allDone }) { return .done }
+        return day < Calendar.current.startOfDay(for: Date()) ? .overdue : .open
+    }
+
     func deadlineOn(_ day: Date) -> Bool {
         active.contains { !$0.allDone && ($0.deadline.map { Calendar.current.isDate($0, inSameDayAs: day) } ?? false) }
     }

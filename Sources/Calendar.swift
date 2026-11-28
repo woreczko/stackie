@@ -53,28 +53,68 @@ struct DayBubble: View {
     var selected = false
 
     var body: some View {
+        // mały dzień (kartka kalendarza w stosie, widok roku): kolor mówi, jak poszedł dzień
         let today = Calendar.current.isDateInToday(day)
-        let closed = store.closedOn(day)
-        let due = store.deadlineOn(day)
-        let ring = size * 0.09
-        let fill: Color = today ? PriorityIcon.purple : closed ? Color.ink : Color.ink.opacity(0.05)
+        let st = store.dayStatus(day)
+        let fill: Color = today ? PriorityIcon.purple : DAY_FILL(st)
         ZStack {
-            Circle().fill(fill).padding(ring + size * 0.04)
-            DayRing(segs: store.segments(on: day, mode: mode), width: ring)
+            Circle().fill(fill).padding(size * 0.06)
             Text("\(Calendar.current.component(.day, from: day))")
-                .font(.system(size: size * 0.34, weight: today || closed ? .bold : .medium).monospacedDigit())
-                .foregroundStyle(today ? .white : closed ? Color.onInk : Color.ink.opacity(dim ? 0.45 : 0.85))
-            if due {
-                Circle().fill(PriorityIcon.purple)
-                    .overlay(Circle().strokeBorder(CAL_PAPER, lineWidth: size * 0.04))
-                    .frame(width: size * 0.26, height: size * 0.26)
-                    .offset(x: size * 0.34, y: size * 0.34)
-            }
-            if selected {
-                Circle().strokeBorder(Color.ink, lineWidth: 1.5).padding(-size * 0.08)
-            }
+                .font(.system(size: size * 0.38, weight: today || st != .none ? .bold : .medium).monospacedDigit())
+                .foregroundStyle(today || st == .overdue ? .white : st == .done ? Color.inkFixed : Color.ink.opacity(dim ? 0.45 : 0.85))
+            if selected { Circle().strokeBorder(Color.ink, lineWidth: 1.5).padding(-size * 0.04) }
         }
         .frame(width: size, height: size)
+    }
+}
+
+let DAY_DONE = Color(hex: 0x7DD39A)
+let DAY_LATE = Color(hex: 0xE5533D)
+func DAY_FILL(_ s: Store.DayStatus) -> Color {
+    switch s {
+    case .done: return DAY_DONE
+    case .overdue: return DAY_LATE
+    case .open: return Color.ink.opacity(0.2)
+    case .none: return Color.ink.opacity(0.05)
+    }
+}
+
+/// Dzień w widoku miesiąca: pigułka z numerem, pod nim jeden znak (zrobione, zaległe, otwarte), dziś z obwódką.
+struct DayPill: View {
+    @EnvironmentObject var store: Store
+    var day: Date
+    var dim = false
+    var selected = false
+
+    var body: some View {
+        let today = Calendar.current.isDateInToday(day)
+        let st = store.dayStatus(day)
+        VStack(spacing: 6) {
+            Text("\(Calendar.current.component(.day, from: day))")
+                .font(.system(size: 15, weight: .semibold).monospacedDigit())
+                .opacity(dim && !today ? 0.5 : 1)
+            ZStack {
+                switch st {
+                case .done:
+                    Circle().fill(DAY_DONE)
+                    Image(systemName: "checkmark").font(.system(size: 9, weight: .heavy)).foregroundStyle(Color.inkFixed)
+                case .overdue:
+                    Circle().fill(DAY_LATE)
+                    Image(systemName: "exclamationmark").font(.system(size: 9, weight: .heavy)).foregroundStyle(.white)
+                case .open:
+                    Circle().fill(Color.ink.opacity(0.22))
+                case .none:
+                    Color.clear
+                }
+            }
+            .frame(width: 18, height: 18)
+        }
+        .frame(width: 44, height: 60)
+        .background(RoundedRectangle(cornerRadius: 19, style: .continuous).fill(Color.ink.opacity(selected ? 0.14 : 0.05)))
+        .overlay { if today { RoundedRectangle(cornerRadius: 19, style: .continuous).strokeBorder(Color.ink, lineWidth: 2) } }
+        .frame(maxWidth: .infinity)
+        .help(st == .done ? L("Wszystko z terminem tego dnia zrobione") : st == .overdue ? L("Termin minął, coś zostało")
+              : st == .open ? L("Termin tego dnia") : "")
     }
 }
 
@@ -193,19 +233,6 @@ struct CalendarView: View {
                     Spacer(minLength: 0)
                 }
                 HStack(spacing: 8) {
-                    HStack(spacing: 2) {
-                        ForEach([CalMode.client, .project, .tag], id: \.self) { m in
-                            Button { withAnimation(.spring(response: 0.25)) { modeRaw = m.rawValue } } label: {
-                                Text(m == .client ? L("Klienci") : m == .project ? L("Projekty") : L("Tagi")).font(.system(size: 11.5, weight: .semibold))
-                                    .foregroundStyle(mode == m ? Color.onInk : Color.ink.opacity(0.7))
-                                    .padding(.horizontal, 10).frame(height: 24)
-                                    .background(Capsule().fill(mode == m ? Color.ink : .clear))
-                                    .contentShape(Capsule())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(2).background(Capsule().fill(Color.ink.opacity(0.07)))
                     segmented([(L("Miesiąc"), !yearView), (L("Rok"), yearView)]) { i in yearView = i == 1; selected = nil }
                     Spacer()
                     navButton("chevron.left") { shift(-1) }
@@ -306,7 +333,7 @@ private struct DayCell: View {
     var body: some View {
         if let day {
             let sel = selected.map { Calendar.current.isDate($0, inSameDayAs: day) } ?? false
-            DayBubble(day: day, mode: mode, size: 52, dim: weekend, selected: sel)
+            DayPill(day: day, dim: weekend, selected: sel)
                 .frame(maxWidth: .infinity, minHeight: 62, maxHeight: 62)
                 .contentShape(Rectangle())
                 .onTapGesture { tap(day) }

@@ -167,6 +167,7 @@ let EN: [String: String] = [
     "Beata dzwoniła, reklama do ELLE na piątek!! logo od Kampa": "Beata called, ELLE ad for Friday!! logo from Kamp",
     "Przeniesiono do: %@": "Moved to: %@", "Skopiowano do: %@": "Copied to: %@",
     "Archiwum": "Archive",
+    "Wszystko z terminem tego dnia zrobione": "Everything due that day is done", "Termin minął, coś zostało": "Past due, something is left", "Termin tego dnia": "Something is due that day",
     "STATUS ZADAŃ": "TASK STATUS", "zamknięte": "done", "w trakcie": "in progress", "nieruszone": "not started",
     "DLA KOGO NAJWIĘCEJ": "WHO GETS THE MOST", "Wszystkie": "All", "Pozostałe": "Other",
     "Nic jeszcze nie odhaczone.": "Nothing ticked off yet.", "Brak zadań w tym okresie.": "No tasks in this period.",
