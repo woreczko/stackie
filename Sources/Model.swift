@@ -649,6 +649,8 @@ struct TodayGroup: Identifiable {
     var open = 0
     var total = 0
     var notes: [UUID] = []
+    /// Coś z tej grupy jest po terminie (z poprzednich dni, nieskończone).
+    var overdue = false
     /// Projekty klienta i ile w każdym zostało (pod nazwą klienta, gdy jest ich więcej niż jeden).
     var projects: [(name: String, open: Int)] = []
 }
@@ -658,7 +660,10 @@ extension Store {
     func todayGroups(_ notes: [Note], now: Date = Date()) -> [TodayGroup] {
         var out: [TodayGroup] = []
         for n in notes {
-            guard let d = n.deadline, Calendar.current.isDate(d, inSameDayAs: now) else { continue }
+            guard let d = n.deadline else { continue }
+            // dziś albo zaległe z poprzednich dni, dopóki nie są zrobione
+            let late = d < Calendar.current.startOfDay(for: now)
+            guard Calendar.current.isDate(d, inSameDayAs: now) || (late && !n.allDone) else { continue }
             let name = !n.client.isEmpty ? n.client : !n.project.isEmpty ? n.project : n.shownTitle
             let key = (!n.client.isEmpty ? "c:" : !n.project.isEmpty ? "p:" : "t:") + name.lowercased()
             // karteczka bez zadań liczy się jako jedna rzecz do zrobienia
@@ -668,6 +673,7 @@ extension Store {
             }
             let i = out.firstIndex { $0.key == key }!
             out[i].open += open; out[i].total += total; out[i].notes.append(n.id)
+            if late { out[i].overdue = true }
             if !n.client.isEmpty {
                 // karteczka klienta bez projektu liczy się pod swoim tytułem
                 let pname = !n.project.isEmpty ? n.project : n.shownTitle

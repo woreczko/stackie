@@ -452,11 +452,13 @@ struct TodayCard: View {
                             Spacer(minLength: 6)
                             // sama liczba zadań: więcej miejsca na nazwę klienta
                             if g.open > 0 {
+                                // zaległe: czerwona liczba
                                 Text("\(g.open)").font(.system(size: 11, weight: .semibold).monospacedDigit())
-                                    .foregroundStyle(fg.opacity(0.75))
+                                    .foregroundStyle(g.overdue ? Color.white : fg.opacity(0.75))
                                     .padding(.horizontal, 6).padding(.vertical, 1)
-                                    .background(Capsule().fill(fg.opacity(0.08)))
+                                    .background(Capsule().fill(g.overdue ? Color(hex: 0xD93A26) : fg.opacity(0.08)))
                                     .fixedSize()
+                                    .help(g.overdue ? L("Po terminie") : "")
                             }
                         }
                         .foregroundStyle(fg.opacity(g.open == 0 ? 0.45 : 0.92))
