@@ -520,6 +520,46 @@ final class Store: ObservableObject {
 
     // MARK: podsumowanie miesiąca
 
+    /// Zadania z projektów okresu: zamknięte, w trakcie, nieruszone (liczba zadań, nie nakład pracy).
+    func taskStatus(in m: Date, _ g: Calendar.Component = .month) -> (done: Int, doing: Int, idle: Int) {
+        var r = (done: 0, doing: 0, idle: 0)
+        for n in projects(in: m, g) where !n.locked {
+            for t in n.tasks where !t.text.trimmingCharacters(in: .whitespaces).isEmpty {
+                if t.done { r.done += 1 } else if t.doing { r.doing += 1 } else { r.idle += 1 }
+            }
+        }
+        return r
+    }
+
+    struct Share: Identifiable { let id: String; let label: String; let color: Color; var count: Int; var client = ""; var project = "" }
+
+    /// Udział klientów albo projektów w liczbie zadań okresu (`doneOnly`: tylko odhaczone w tym okresie).
+    /// Największe pierwsze; ponad `top` zebrane jako „Pozostałe”.
+    func share(in m: Date, _ g: Calendar.Component = .month, byClient: Bool, doneOnly: Bool, top: Int = 6) -> [Share] {
+        var map: [String: Share] = [:]
+        for n in projects(in: m, g) where !n.locked {
+            let k = n.tasks.filter { t in
+                !t.text.trimmingCharacters(in: .whitespaces).isEmpty && (!doneOnly || (t.done && Store.same(t.doneAt, month: m, g)))
+            }.count
+            guard k > 0 else { continue }
+            let s: Share
+            if byClient {
+                s = n.client.isEmpty ? Share(id: "-", label: L("bez klienta"), color: Color(hex: 0x8E8B86), count: 0)
+                    : Share(id: "c:" + n.client.lowercased(), label: n.client, color: clientColor(n.client), count: 0, client: n.client)
+            } else {
+                s = n.project.isEmpty ? Share(id: n.id.uuidString, label: n.shownTitle, color: accent(n.color), count: 0)
+                    : Share(id: "p:" + n.project.lowercased(), label: n.project, color: tagColor(n.project, kind: "p:"), count: 0, project: n.project)
+            }
+            map[s.id, default: s].count += k
+        }
+        var list = map.values.sorted { $0.count != $1.count ? $0.count > $1.count : $0.label < $1.label }
+        if list.count > top {
+            let rest = list[(top - 1)...].reduce(0) { $0 + $1.count }
+            list = Array(list.prefix(top - 1)) + [Share(id: "rest", label: L("Pozostałe"), color: Color(hex: 0x55545A), count: rest)]
+        }
+        return list
+    }
+
     static func same(_ a: Date?, month m: Date, _ g: Calendar.Component = .month) -> Bool {
         guard let a else { return false }
         return Calendar.current.isDate(a, equalTo: m, toGranularity: g)

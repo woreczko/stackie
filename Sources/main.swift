@@ -377,7 +377,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     func toggleCalendar() {
         if calendar?.isVisible == true { calendar?.orderOut(nil); return }
-        let size = NSSize(width: 800, height: 600)
+        let size = NSSize(width: 860, height: 600)
         if calendar == nil {
             let p = Panel(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless], backing: .buffered, defer: false)
             p.isOpaque = false; p.backgroundColor = .clear; p.hasShadow = true

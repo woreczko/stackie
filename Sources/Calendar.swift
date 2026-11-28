@@ -246,12 +246,12 @@ struct CalendarView: View {
 
             // Podsumowanie
             Summary(month: month, selected: selected, mode: mode, g: yearView ? .year : .month, open: open, clearDay: { selected = nil })
-                .frame(width: 280)
+                .frame(width: 340)
                 .frame(maxHeight: .infinity, alignment: .top)
                 .background(CAL_BG)
         }
         .foregroundStyle(Color.ink)
-        .frame(width: 800, height: 600)
+        .frame(width: 860, height: 600)
         .background(CAL_PAPER)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(.black.opacity(0.12)))
@@ -342,23 +342,9 @@ private struct Summary: View {
                 }
                 .padding(.top, 10)
 
-                Donut(progress: store.progress(in: month, g), year: g == .year).padding(.top, 22)
-
-                let legend = store.segments(of: store.projects(in: month, g), mode: mode)
-                if !legend.isEmpty {
-                    sectionTitle(mode == .client ? L("Kolory klientów") : mode == .project ? L("Kolory projektów") : L("Kolory tagów"))
-                    FlowLayout(spacing: 6) {
-                        ForEach(legend, id: \.self) { sg in
-                            HStack(spacing: 5) {
-                                Circle().fill(sg.color).frame(width: 8, height: 8)
-                                Text(sg.label).font(.system(size: 11, weight: .medium)).lineLimit(1)
-                            }
-                            .padding(.horizontal, 8).frame(height: 22)
-                            .background(Capsule().fill(.white.opacity(0.08)))
-                        }
-                    }
-                }
-
+                // dwa paski: status zadań i dla kogo robimy najwięcej (ten sam okres)
+                StatusBar(status: store.taskStatus(in: month, g)).padding(.top, 22)
+                ShareBar(month: month, g: g)
                 if let selected {
                     let day = store.touched(on: selected)
                     sectionTitle("\(Calendar.current.component(.day, from: selected)) \(monthShort(Calendar.current.component(.month, from: selected)).lowercased())", clear: true)
@@ -438,7 +424,7 @@ private struct Summary: View {
     }
 }
 
-/// Wykres: ile zadań z projektów tego miesiąca zrobione, a ile zostało.
+/// (stary wykres kołowy, już nieużywany)
 private struct Donut: View {
     var progress: (done: Int, total: Int)
     var year = false
@@ -503,5 +489,132 @@ private struct YearGrid: View {
                 .onTapGesture { pick(m) }
             }
         }
+    }
+}
+
+
+/// Pasek z segmentami (szerokość = udział), zaokrąglone kawałki z odstępem jak na referencji.
+private struct SegBar: View {
+    var parts: [(Color, Int)]
+    var height: CGFloat = 24
+    var body: some View {
+        let total = max(1, parts.reduce(0) { $0 + $1.1 })
+        GeometryReader { g in
+            let gap: CGFloat = 3, n = CGFloat(parts.filter { $0.1 > 0 }.count)
+            let w = max(0, g.size.width - gap * max(0, n - 1))
+            HStack(spacing: gap) {
+                ForEach(Array(parts.enumerated()), id: \.offset) { _, p in
+                    if p.1 > 0 {
+                        RoundedRectangle(cornerRadius: 6, style: .continuous).fill(p.0)
+                            .frame(width: max(4, w * CGFloat(p.1) / CGFloat(total)))
+                    }
+                }
+            }
+        }
+        .frame(height: height)
+        .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(.white.opacity(parts.allSatisfy { $0.1 == 0 } ? 0.08 : 0)))
+        .animation(.spring(response: 0.35), value: parts.map(\.1))
+    }
+}
+
+/// Status zadań okresu: zamknięte, w trakcie, nieruszone.
+private struct StatusBar: View {
+    var status: (done: Int, doing: Int, idle: Int)
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text(L("STATUS ZADAŃ")).font(.system(size: 10, weight: .bold)).tracking(1).opacity(0.5)
+            SegBar(parts: [(Color(hex: 0x7DD39A), status.done), (Color(hex: 0xA597F3), status.doing), (.white.opacity(0.22), status.idle)])
+            HStack(alignment: .top, spacing: 0) {
+                item(Color(hex: 0x7DD39A), status.done, L("zamknięte"))
+                item(Color(hex: 0xA597F3), status.doing, L("w trakcie"))
+                item(.white.opacity(0.35), status.idle, L("nieruszone"))
+            }
+        }
+    }
+    private func item(_ c: Color, _ n: Int, _ t: String) -> some View {
+        HStack(alignment: .top, spacing: 6) {
+            RoundedRectangle(cornerRadius: 1.5).fill(c).frame(width: 3, height: 30)
+            VStack(alignment: .leading, spacing: 0) {
+                Text("\(n)").font(.system(size: 15, weight: .semibold)).monospacedDigit()
+                Text(t).font(.system(size: 10.5)).opacity(0.6).lineLimit(1).fixedSize()
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// Dla kogo robimy najwięcej: klienci albo projekty, wszystkie albo zamknięte zadania.
+private struct ShareBar: View {
+    @EnvironmentObject var store: Store
+    var month: Date
+    var g: Calendar.Component
+    @AppStorage("shareByClient") private var byClient = true
+    @AppStorage("shareDone") private var doneOnly = false
+
+    var body: some View {
+        let list = store.share(in: month, g, byClient: byClient, doneOnly: doneOnly)
+        let total = max(1, list.reduce(0) { $0 + $1.count })
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(L("DLA KOGO NAJWIĘCEJ")).font(.system(size: 10, weight: .bold)).tracking(1).opacity(0.5)
+                Spacer()
+            }
+            .padding(.top, 22)
+            HStack(spacing: 6) {
+                toggle([(L("Klienci"), byClient), (L("Projekty"), !byClient)]) { byClient = $0 == 0 }
+                toggle([(L("Wszystkie"), !doneOnly), (L("Zamknięte"), doneOnly)]) { doneOnly = $0 == 1 }
+            }
+            SegBar(parts: list.map { ($0.color, $0.count) })
+            if list.isEmpty {
+                Text(doneOnly ? L("Nic jeszcze nie odhaczone.") : L("Brak zadań w tym okresie.")).font(.system(size: 12)).opacity(0.45)
+            }
+            // legenda: kolor, nazwa, liczba zadań, udział
+            VStack(alignment: .leading, spacing: 7) {
+                ForEach(list) { s in
+                    Button { pick(s) } label: {
+                        HStack(spacing: 8) {
+                            RoundedRectangle(cornerRadius: 1.5).fill(s.color).frame(width: 3, height: 16)
+                            Text(s.label).font(.system(size: 12, weight: .medium)).lineLimit(1).opacity(0.85)
+                            Spacer(minLength: 6)
+                            Text("\(s.count)").font(.system(size: 12, weight: .semibold)).monospacedDigit().opacity(0.85)
+                            Text("\(Int((Double(s.count) * 100 / Double(total)).rounded()))%").font(.system(size: 10.5, weight: .semibold)).monospacedDigit()
+                                .padding(.horizontal, 6).frame(height: 18).background(Capsule().fill(.white.opacity(0.08)))
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(s.client.isEmpty && s.project.isEmpty)
+                    .help(s.client.isEmpty && s.project.isEmpty ? "" : L("Pokaż w stosie tylko te karteczki"))
+                }
+            }
+            .padding(10)
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(.white.opacity(0.05)))
+            Text(L("Udział w liczbie zadań, nie w czasie pracy.")).font(.system(size: 9.5)).opacity(0.4)
+        }
+    }
+
+    /// Kliknięcie: stos pokazuje tylko tego klienta albo projekt.
+    private func pick(_ s: Store.Share) {
+        if !s.client.isEmpty { UIState.shared.setFilter(client: s.client) }
+        else if !s.project.isEmpty { UIState.shared.setFilter(project: s.project) }
+        else { return }
+        AppDelegate.shared?.toggleCalendar()
+    }
+
+    private func toggle(_ items: [(String, Bool)], _ pick: @escaping (Int) -> Void) -> some View {
+        HStack(spacing: 2) {
+            ForEach(Array(items.enumerated()), id: \.offset) { i, it in
+                Button { withAnimation(.spring(response: 0.25)) { pick(i) } } label: {
+                    Text(it.0).font(.system(size: 10.5, weight: .semibold))
+                        .foregroundStyle(it.1 ? Color(hex: 0x1E1D22) : .white.opacity(0.7))
+                        .padding(.horizontal, 8).frame(height: 20)
+                        .fixedSize()
+                        .background(Capsule().fill(it.1 ? .white.opacity(0.9) : .clear))
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(2).background(Capsule().fill(.white.opacity(0.08)))
     }
 }
