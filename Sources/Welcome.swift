@@ -5,7 +5,7 @@ import UserNotifications
 
 // MARK: - Okienko powitalne: strony z animacjami możliwości i historia zmian
 
-let APP_VERSION = "1.4.1"
+let APP_VERSION = "1.5"
 
 /// `since`: wersja, w której funkcja się pojawiła (po aktualizacji pokazujemy tylko nowsze strony).
 struct WelcomePage { let title: String; let text: String; let demo: AnyView; var since = "1.0" }
@@ -38,7 +38,7 @@ struct WelcomeView: View {
             WelcomePage(title: L("Projekty i zadania"), text: L("Jedna karteczka to jeden projekt. Odhaczasz kółeczka, a pasek pokazuje postęp. Zadania przesuwasz za uchwyt."), demo: AnyView(DemoTasks())),
             WelcomePage(title: L("Terminy i przypomnienia"), text: L("Data w rogu, pilność w kolorach. Dzwoneczek ustawia przypomnienia, a karteczka podskakuje, gdy termin jest blisko."), demo: AnyView(DemoReminder())),
             WelcomePage(title: L("Klienci, projekty i tagi"), text: L("Każda karteczka może mieć klienta, projekt i tagi. Kliknij jeden z nich, żeby zostawić w stosie tylko to, co do niego pasuje."), demo: AnyView(DemoFilter())),
-            WelcomePage(title: L("Kalendarz i podsumowanie"), text: L("Szara karta na końcu stosu to kalendarz. Zielony ptaszek to dzień zamknięty, czerwony znak to coś zaległego. Obok paski: co zrobione i dla kogo najwięcej."), demo: AnyView(DemoCalendar())),
+            WelcomePage(title: L("Kalendarz i podsumowanie"), text: L("Szara karta na końcu stosu to kalendarz. Zielony ptaszek to dzień zamknięty, czerwony znak to coś zaległego. Obok paski: co zrobione i dla kogo najwięcej."), demo: AnyView(DemoCalendar()), since: "1.5"),
             WelcomePage(title: L("Pliki przy karteczce"), text: L("Przeciągnij PDF, zdjęcie albo inny plik na otwartą karteczkę. Stosik trzyma kopię, więc nic nie zginie."), demo: AnyView(DemoFiles())),
             WelcomePage(title: L("Kosz na 30 dni"), text: L("Pociągnij karteczkę w dół, aż kosz zrobi się czerwony. Przez 30 dni możesz ją przywrócić."), demo: AnyView(DemoTrash())),
             WelcomePage(title: L("Dyktowanie"), text: L("Kliknij mikrofon i powiedz, co jest do zrobienia. Każdy czasownik zaczyna nowe zadanie, a „klient”, „projekt” i „tag” wypełniają pola."), demo: AnyView(DemoDictation())),
@@ -46,6 +46,10 @@ struct WelcomeView: View {
             WelcomePage(title: L("Zadania z notatki"), text: L("Piszesz szybko i bez ładu, np. przy telefonie. Kliknij ✨ „Zrób zadania”, a Claude ułoży z tego listę zadań z klientem i terminem. Najpierw zobaczysz propozycję."), demo: AnyView(DemoSmart()), since: "1.3"),
             WelcomePage(title: L("Szybka notatka z rogu"), text: L("Wjedź kursorem w róg ekranu i pisz albo dyktuj, na brudno. Potem zapisz albo kliknij ✨ „Zrób zadania”. Róg wybierasz w ustawieniach pod kółkiem zębatym."), demo: AnyView(DemoCorner()), since: "1.4.1"),
             WelcomePage(title: L("Przenieś albo skopiuj zadanie"), text: L("Najedź na zadanie i kliknij strzałkę obok krzyżyka. Wybierz karteczkę z listy, a zadanie przejdzie tam albo trafi do obu."), demo: AnyView(DemoMove()), since: "1.4.1"),
+            WelcomePage(title: L("Ciemny wygląd"), text: L("Grafitowe karteczki, kolor tylko na brzegu i w kółkach. W ustawieniach: Wygląd. Tam też suwak przezroczystości stosu."), demo: AnyView(DemoDark()), since: "1.5"),
+            WelcomePage(title: L("Karteczki pod Touch ID"), text: L("Kłódka w edytorze zasłania karteczkę w stosie. Otwiera się po Touch ID i zamyka, gdy zamkniesz edytor."), demo: AnyView(DemoLock()), since: "1.5"),
+            WelcomePage(title: L("AI w notatce"), text: L("Różdżka obok „Zrób zadania”: popraw pisownię, uprość, przetłumacz albo streść notatkę. Zawsze możesz cofnąć."), demo: AnyView(DemoWand()), since: "1.5"),
+            WelcomePage(title: L("Szybciej do karteczki"), text: L("⌃⌥ Spacja otwiera szybką notatkę od razu z dyktowaniem. Tekst, link albo plik upuszczony na stos robi się karteczką."), demo: AnyView(DemoFast()), since: "1.5"),
             WelcomePage(title: L("Rozmiar stosu"), text: L("Mały ekran? W ustawieniach pod kółkiem zębatym zmniejszysz stos albo przełączysz się na małe karteczki: sam tytuł, data i licznik."), demo: AnyView(DemoSizes()), since: "1.3"),
         ]
     }
@@ -122,6 +126,16 @@ struct WelcomeView: View {
 struct Release { let version: String; let date: String; let items: [String] }
 
 var RELEASES: [Release] {[
+    Release(version: "1.5", date: "28.11.2026", items: [
+        L("Ciemny wygląd i suwak przezroczystości stosu"),
+        L("Karteczki pod Touch ID: w stosie zasłonięte, ukryte w Spotlight i kalendarzu"),
+        L("Przyciski AI w notatce: popraw, uprość, przetłumacz, streść"),
+        L("Skrót ⌃⌥ Spacja: szybka notatka z dyktowaniem; przeciąganie tekstu, linków i plików na stos"),
+        L("Nowy kalendarz: stan dnia (zrobione, zaległe), paski Status zadań i Dla kogo najwięcej"),
+        L("Zadanie „w trakcie” (⌥ i klik w kółko), Na dziś pokazuje też zaległe"),
+        L("Karteczki w Spotlight; połączenie z Claude Code i Claude Desktop (MCP)"),
+        L("Standard i Pro w ustawieniach: widać, czym liczy „Zrób zadania”"),
+    ]),
     Release(version: "1.4.1", date: "27.11.2026", items: [
         L("Szybka notatka z rogu ekranu: pisz albo dyktuj, zapisz na brudno albo zrób z tego zadania"),
         L("Przenieś albo skopiuj zadanie na inną karteczkę"),
@@ -817,6 +831,119 @@ struct DemoSmart: View {
                     }
             }
             .opacity(1 - ease(t, 0.93, 1.0))
+        }
+    }
+}
+
+
+/// Ciemny wygląd: grafitowe karteczki z kolorowym brzegiem, stos raz pełny, raz przezroczysty.
+struct DemoDark: View {
+    var body: some View {
+        Loop(period: 4.5) { t in
+            let fade = ease(t, 0.45, 0.6) * (1 - ease(t, 0.8, 0.95))
+            HStack(spacing: -40) {
+                ForEach(Array([(5, "Faktury"), (7, "ELLE"), (2, "Logo")].enumerated()), id: \.offset) { i, c in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(c.1).font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
+                        ForEach(0..<3, id: \.self) { k in
+                            HStack(spacing: 6) {
+                                Circle().strokeBorder(accent(c.0), lineWidth: 1.4).frame(width: 11, height: 11)
+                                    .background(Circle().fill(k == 0 ? accent(c.0) : .clear))
+                                Capsule().fill(.white.opacity(0.25)).frame(width: 60 - CGFloat(k * 10), height: 5)
+                            }
+                        }
+                        Spacer(minLength: 0)
+                        Capsule().fill(accent(c.0)).frame(width: 44, height: 3)
+                    }
+                    .padding(14)
+                    .frame(width: 130, height: 160, alignment: .topLeading)
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color(hex: DARK_CARD))
+                        .overlay(TopRim(color: accent(c.0), corner: 12, width: 2.5, fade: 24)))
+                    .shadow(color: .black.opacity(0.4), radius: 8, y: 4)
+                    .rotationEffect(.degrees(Double(i - 1) * 4))
+                }
+            }
+            .opacity(1 - 0.55 * fade)
+        }
+    }
+}
+
+/// Touch ID: zasłonięta karteczka, odcisk palca, karteczka się odsłania.
+struct DemoLock: View {
+    var body: some View {
+        Loop(period: 4.5) { t in
+            let touch = ease(t, 0.3, 0.45), open = ease(t, 0.5, 0.62) * (1 - ease(t, 0.88, 0.98))
+            ZStack {
+                DemoCard(note: demoNote(1, L("Hasła do kont"), [L("Bank"), L("Poczta"), L("Serwer")]), scale: 0.62)
+                    .overlay(LockCover(bg: accent(1), fg: Color.inkFixed, corner: 14 * 0.62, mini: true).opacity(1 - open))
+                Image(systemName: "touchid").font(.system(size: 34)).foregroundStyle(Color(hex: 0xEC5B44))
+                    .padding(10).background(Circle().fill(.white))
+                    .scaleEffect(0.8 + 0.2 * touch).opacity(touch * (1 - open))
+                    .offset(x: 110, y: 40)
+            }
+            .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+        }
+    }
+}
+
+/// Różdżka: chaotyczna notatka po poprawie i jako punkty.
+struct DemoWand: View {
+    var body: some View {
+        Loop(period: 6) { t in
+            let menu = ease(t, 0.15, 0.25) * (1 - ease(t, 0.38, 0.42))
+            let fixed = t > 0.42
+            HStack(alignment: .top, spacing: 18) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(L("Notatka")).font(.system(size: 9, weight: .bold)).tracking(0.7).textCase(.uppercase).foregroundStyle(Color.inkFixed.opacity(0.55))
+                        Spacer()
+                        Image(systemName: "wand.and.stars").font(.system(size: 11, weight: .semibold)).foregroundStyle(Color.inkFixed.opacity(0.7))
+                    }
+                    Text(fixed ? L("Beata dzwoniła, że reklama do ELLE musi być na piątek. Logo od Kampa jeszcze nie dotarło.")
+                               : L("beata dzwonila ze reklama do elle musi byc na piatek logo od kampa jeszcze nie dotarlo"))
+                        .font(.system(size: 12.5)).foregroundStyle(Color.inkFixed.opacity(0.85))
+                        .frame(width: 200, alignment: .topLeading)
+                        .animation(.easeInOut(duration: 0.3), value: fixed)
+                }
+                .padding(12).frame(width: 230, height: 130, alignment: .topLeading)
+                .background(RoundedRectangle(cornerRadius: 12).fill(PAPER_FIXED))
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach([L("Popraw pisownię"), L("Uprość"), L("Przetłumacz (PL ↔ EN)"), L("Streść w punktach")], id: \.self) { x in
+                        Text(x).font(.system(size: 11.5, weight: .medium)).foregroundStyle(Color.inkFixed)
+                            .padding(.horizontal, 9).padding(.vertical, 4)
+                            .background(RoundedRectangle(cornerRadius: 5).fill(x == L("Popraw pisownię") ? Color(hex: 0xC9BEFF) : .clear))
+                    }
+                }
+                .padding(6).background(RoundedRectangle(cornerRadius: 8).fill(.white))
+                .opacity(menu).scaleEffect(0.9 + 0.1 * menu, anchor: .topLeading)
+            }
+        }
+    }
+}
+
+/// Skrót klawiszowy i przeciąganie na stos.
+struct DemoFast: View {
+    var body: some View {
+        Loop(period: 5) { t in
+            let keys = ease(t, 0.05, 0.15) * (1 - ease(t, 0.4, 0.45))
+            let drag = ease(t, 0.5, 0.8)
+            HStack(spacing: 40) {
+                HStack(spacing: 6) {
+                    ForEach(["⌃", "⌥", L("Spacja")], id: \.self) { k in
+                        Text(k).font(.system(size: 16, weight: .semibold)).foregroundStyle(.white)
+                            .padding(.horizontal, 12).frame(height: 40)
+                            .background(RoundedRectangle(cornerRadius: 8).fill(.white.opacity(0.12 + 0.25 * keys)))
+                    }
+                }
+                .scaleEffect(1 - 0.06 * keys)
+                ZStack {
+                    DemoCard(note: demoNote(6, L("Klient: kawiarnia"), [L("Pierwszy krok")]), scale: 0.5)
+                        .shadow(color: .black.opacity(0.3), radius: 6, y: 3)
+                    Image(systemName: "doc.text.fill").font(.system(size: 30)).foregroundStyle(.white)
+                        .offset(x: 90 - 90 * drag, y: -70 + 70 * drag)
+                        .opacity(1 - ease(t, 0.8, 0.85))
+                }
+            }
         }
     }
 }

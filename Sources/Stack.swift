@@ -334,7 +334,6 @@ struct StackView: View {
                 let isHover = ui.hovered == n.id
                 let isDrag = ui.dragID == n.id
                 let down = isDrag ? max(0, ui.dragDY) : 0
-                let armed = down > StackLayout.trashArm
                 let tilt = StackLayout.angle(i, spread: ui.spread)
                 CardView(note: store.binding(n.id), lifted: isHover || isDrag, mini: StackLayout.mini)
                     .rotationEffect(.degrees(isHover || isDrag ? 0 : tilt))

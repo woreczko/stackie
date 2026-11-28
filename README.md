@@ -36,7 +36,7 @@ Otwórz link i kliknij **Stackie-….zip** w sekcji *Assets*. Rozpakuj i przeci�
 
 ## Install
 
-1. Download **Stackie-1.4.1.zip** from [Releases](../../releases).
+1. Download **Stackie-1.5.zip** from [Releases](../../releases).
 2. Unzip it and move **Stosik.app** to **Applications** (on an English Mac it shows as *Stackie*).
 3. Double-click to open. The app is signed and notarized by Apple, so macOS opens it without warnings.
 4. Stackie lives in the menu bar and on your desktop (no Dock icon). A welcome window shows what it can do and asks for the permissions it needs (notifications for reminders, microphone and speech recognition for dictation).
@@ -61,7 +61,7 @@ Your notes are stored in `~/Library/Application Support/Stosik/`.
 
 **Karteczki na pulpicie Maca, ułożone w stos jak talia kart.** Najedź myszką, a stos się rozłoży. Każda karteczka to projekt z zadaniami, klientem, tagami, terminem i przypomnieniami. Możesz do niej dołączać pliki: PDF-y, zdjęcia i inne. Kartka „Na dziś”, zadania z chaotycznej notatki dzięki Claude, szybka karteczka z rogu ekranu i trzy rozmiary stosu. Nowe wersje instalują się same.
 
-- **Instalacja:** pobierz **Stackie-1.4.1.zip** z zakładki [Releases](../../releases), rozpakuj i przenieś **Stosik.app** do **Aplikacji**.
+- **Instalacja:** pobierz **Stackie-1.5.zip** z zakładki [Releases](../../releases), rozpakuj i przenieś **Stosik.app** do **Aplikacji**.
 - **Pierwsze uruchomienie:** otwórz dwuklikiem. Apka jest podpisana i sprawdzona przez Apple, więc macOS jej nie blokuje.
 - **Gdzie jest:** Stosik siedzi w pasku menu i na pulpicie, bez ikony w Docku. Okienko powitalne pokaże, co umie, i poprosi o zgody: powiadomienia do przypomnień oraz mikrofon i rozpoznawanie mowy do dyktowania.
 - **Wymagania:** macOS 14 albo nowszy, Mac z Apple Silicon albo z Intelem.

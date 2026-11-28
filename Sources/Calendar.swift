@@ -23,25 +23,6 @@ func monthTitle(_ m: Date) -> (String, Int) {
     return (monthName(c.month ?? 1), c.year ?? 2026)
 }
 
-/// Pierścień dnia: równe części na każdy projekt albo tag z tego dnia.
-struct DayRing: View {
-    var segs: [Seg]
-    var width: CGFloat
-
-    var body: some View {
-        let n = Double(segs.count)
-        let gap = n > 1 ? 0.06 : 0
-        ZStack {
-            ForEach(Array(segs.enumerated()), id: \.offset) { i, sg in
-                Circle()
-                    .trim(from: Double(i) / n + gap / 2, to: Double(i + 1) / n - gap / 2)
-                    .stroke(sg.color, style: StrokeStyle(lineWidth: width, lineCap: n > 1 ? .round : .butt))
-            }
-        }
-        .rotationEffect(.degrees(-90))
-        .padding(width / 2)
-    }
-}
 
 /// Kółeczko dnia: pierścień, wypełnienie (dziś, zamknięty projekt) i kropka terminu.
 struct DayBubble: View {
@@ -451,41 +432,6 @@ private struct Summary: View {
     }
 }
 
-/// (stary wykres kołowy, już nieużywany)
-private struct Donut: View {
-    var progress: (done: Int, total: Int)
-    var year = false
-
-    var body: some View {
-        let p = progress.total == 0 ? 0 : Double(progress.done) / Double(progress.total)
-        HStack(spacing: 18) {
-            ZStack {
-                Circle().stroke(.white.opacity(0.13), lineWidth: 14)
-                Circle().trim(from: 0, to: p)
-                    .stroke(Color(hex: 0x9BE08F), style: StrokeStyle(lineWidth: 14, lineCap: p > 0 && p < 1 ? .round : .butt))
-                    .rotationEffect(.degrees(-90))
-                VStack(spacing: 0) {
-                    Text("\(Int((p * 100).rounded()))%").font(.system(size: 22, weight: .semibold)).monospacedDigit()
-                }
-            }
-            .frame(width: 104, height: 104)
-            .animation(.spring(response: 0.4), value: p)
-            VStack(alignment: .leading, spacing: 8) {
-                legendRow(Color(hex: 0x9BE08F), L("zrobione"), progress.done)
-                legendRow(.white.opacity(0.25), L("zostało"), progress.total - progress.done)
-                Text(L(year ? "zadania z projektów\ntego roku" : "zadania z projektów\ntego miesiąca")).font(.system(size: 9.5)).opacity(0.45)
-            }
-        }
-    }
-
-    private func legendRow(_ c: Color, _ t: String, _ n: Int) -> some View {
-        HStack(spacing: 6) {
-            Circle().fill(c).frame(width: 8, height: 8)
-            Text("\(n)").font(.system(size: 13, weight: .semibold)).monospacedDigit()
-            Text(t).font(.system(size: 11)).opacity(0.65)
-        }
-    }
-}
 
 /// Cały rok: 12 małych miesięcy z kółkami dni; kliknięcie miesiąca otwiera go.
 private struct YearGrid: View {

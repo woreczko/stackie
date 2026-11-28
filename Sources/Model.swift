@@ -127,7 +127,6 @@ func cleanTag(_ s: String) -> String {
 }
 
 enum CalMode: String { case client, project, tag }
-struct Seg: Hashable { let key: String; let color: Color; let label: String }
 
 struct NoteColor {
     let name: String; let bg: Color; let dark: Bool
@@ -475,27 +474,6 @@ final class Store: ObservableObject {
         }
     }
 
-    func segments(on day: Date, mode: CalMode) -> [Seg] { segments(of: touched(on: day), mode: mode) }
-
-    func segments(of list: [Note], mode: CalMode) -> [Seg] {
-        var out: [Seg] = [], seen = Set<String>()
-        for n in list {
-            let s: Seg
-            switch mode {
-            case .client:
-                if !n.client.isEmpty { s = Seg(key: "c:" + n.client.lowercased(), color: clientColor(n.client), label: n.client) }
-                else { s = Seg(key: "", color: Color(hex: 0xB9B5AE), label: L("bez klienta")) }
-            case .project:
-                if !n.project.isEmpty { s = Seg(key: "p:" + n.project.lowercased(), color: tagColor(n.project, kind: "p:"), label: n.project) }
-                else { s = Seg(key: n.id.uuidString, color: accent(n.color), label: n.shownTitle) }
-            case .tag:
-                if let t = n.tags.first { s = Seg(key: t.lowercased(), color: tagColor(t), label: t) }
-                else { s = Seg(key: "", color: Color(hex: 0xB9B5AE), label: L("bez tagu")) }
-            }
-            if seen.insert(s.key).inserted { out.append(s) }
-        }
-        return out
-    }
 
     func closedOn(_ day: Date) -> Bool {
         archived.contains { $0.archivedAt.map { Calendar.current.isDate($0, inSameDayAs: day) } ?? false }
@@ -509,9 +487,6 @@ final class Store: ObservableObject {
         return day < Calendar.current.startOfDay(for: Date()) ? .overdue : .open
     }
 
-    func deadlineOn(_ day: Date) -> Bool {
-        active.contains { !$0.allDone && ($0.deadline.map { Calendar.current.isDate($0, inSameDayAs: day) } ?? false) }
-    }
 
     /// Projekty miesiąca: w bieżącym wszystko na stosie plus zamknięte; w innym to, co miało w nim termin, zamknięcie albo odhaczenie.
     func projects(in m: Date, _ g: Calendar.Component = .month) -> [Note] {
@@ -521,10 +496,6 @@ final class Store: ObservableObject {
             if now { return true }
             return Store.same(n.deadline, month: m, g) || n.tasks.contains { $0.done && Store.same($0.doneAt, month: m, g) }
         }
-    }
-    func progress(in m: Date, _ g: Calendar.Component = .month) -> (done: Int, total: Int) {
-        let ps = projects(in: m, g)
-        return (ps.reduce(0) { $0 + $1.doneCount }, ps.reduce(0) { $0 + $1.tasks.count })
     }
 
     // MARK: podsumowanie miesiąca
